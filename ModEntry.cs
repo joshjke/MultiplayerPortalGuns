@@ -4,6 +4,7 @@ using PyTK.CustomElementHandler;
 using StardewModdingAPI;
 using StardewValley;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -14,10 +15,20 @@ namespace MultiplayerPortalGuns
     class ModEntry : Mod
     {
         public List<long> playerList = new List<long>();
+        //public LocationPortals LocationPortals = new LocationPortals();
+        LocationPortals PortalTable = new LocationPortals();
+
+        public Dictionary<string, List<Portal>> locationPortals = new Dictionary<string, List<Portal>>();
+        //public Dictionary<int, string> portalsLocation = new Dictionary<int, string>();
+
         public override void Entry(IModHelper helper)
         {
             //throw new NotImplementedException();
             helper.Events.GameLoop.SaveLoaded += this.AfterLoad;
+            Portal buddy = new Portal();
+            PortalTable.AddPortal(buddy);
+
+
 
 
         }
