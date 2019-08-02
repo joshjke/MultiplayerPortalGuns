@@ -11,57 +11,54 @@ namespace MultiplayerPortalGuns
 {
     internal class LocationPortals
     {
-        public Dictionary<string, List<PortalPosition>> LocationsPortals { get; set; }
-        public Dictionary<int, string> PortalsLocation { get; set; }
+        public Dictionary<string, List<PortalPosition>> LocationToList { get; set; }
+        public Dictionary<int, string> IdToLocation { get; set; }
 
         internal LocationPortals()
         {
-            LocationsPortals = new Dictionary<string, List<PortalPosition>>();
-            PortalsLocation = new Dictionary<int, string>();
+            LocationToList = new Dictionary<string, List<PortalPosition>>();
+            IdToLocation = new Dictionary<int, string>();
         }
-        /*
-        /// <summary>
-        /// List of Game Locations
-        /// </summary>
-        /// <returns></returns>
-        private static IEnumerable<GameLocation> GetLocations()
-        {
-            return Game1.locations
-                .Concat(
-                    from location in Game1.locations.OfType<BuildableGameLocation>()
-                    from building in location.buildings
-                    where building.indoors.Value != null
-                    select building.indoors.Value
-                );
-        }
-        */
 
         public bool AddPortal(PortalPosition portal)
         {
             // if the portal already exists in the mappings
-            if (PortalsLocation.ContainsKey(portal.Id))
+            if (IdToLocation.ContainsKey(portal.Id))
             {
                 // try to remove it
-                if (!LocationsPortals[PortalsLocation[portal.Id]].Remove(portal))
+                if (!LocationToList[IdToLocation[portal.Id]].Remove(portal))
                     return false;
                 // set the new mapping
-                PortalsLocation[portal.Id] = portal.LocationName;
+                IdToLocation[portal.Id] = portal.LocationName;
             }
             else // portal does not exist in mapping
             {
                 // if location does not have a mapping with a portal list
-                if (!LocationsPortals.ContainsKey(portal.LocationName))
+                if (!LocationToList.ContainsKey(portal.LocationName))
                 {
                     // add location and give it a new portal list
-                    LocationsPortals.Add(portal.LocationName, new List<PortalPosition>());
+                    LocationToList.Add(portal.LocationName, new List<PortalPosition>());
                 }
                 // add the new portal to the mapping
-                PortalsLocation.Add(portal.Id, portal.LocationName);
+                IdToLocation.Add(portal.Id, portal.LocationName);
             }
             // add the portal to the Location's portal list
-            LocationsPortals[portal.LocationName].Add(portal);
+            LocationToList[portal.LocationName].Add(portal);
             
             return true;
         }
+        public bool RemovePortal(PortalPosition portal)
+        {
+            if (IdToLocation.ContainsKey(portal.Id))
+            {
+                if (!LocationToList[IdToLocation[portal.Id]].Remove(portal))
+                    return false;
+            }
+            if (!IdToLocation.Remove(portal.Id))
+                return false;
+
+            return true;
+        }
     }
+
 }
