@@ -28,12 +28,7 @@ namespace MultiplayerPortalGuns
             {
                 portals[i] = new Portal
                 {
-                    // unique id for retrieving portal from Lists
-                    id = new StringBuilder().Append(name).Append(i).GetHashCode(),
-                    PortalPos = new PortalPosition
-                    {
-                        LocationName = null
-                    },
+                    PortalPos = new PortalPosition(i, this.name),
                     Warp = null
                 };
             }
@@ -58,6 +53,17 @@ namespace MultiplayerPortalGuns
             }
         }
 
+        public void RemovePortals()
+        {
+            RemoveWarps();
+            for (int i = 0; i < 2; i++)
+            {
+                portals[i].PortalPos.LocationName = null;
+            }
+        }
+        /// <summary>
+        /// Helper function for RemovePortals(). Loops through portals array
+        /// </summary>
         void RemoveWarps()
         {
             // (sanitize for active multiplayer)
@@ -71,28 +77,21 @@ namespace MultiplayerPortalGuns
             }
         }
 
-        void RemovePortals()
-        {
-            RemoveWarps();
-            for (int i = 0; i < 2; i++)
-            {
-                portals[i].PortalPos.LocationName = null;
-            }
-        }
+        
 
         bool CreatePortal(int index)
         {
-            PortalPosition portalPos = GetPortalPosition();
-            return AddPortal(index, portalPos);
+            PortalPosition portalPos = GetPortalPosition(index);
+            return AddPortal(portalPos);
         }
 
-        bool AddPortal(int index, PortalPosition portalPos)
+        public bool AddPortal(PortalPosition portalPos)
         {
             // sanitize for multiplayer
             if (!IsPortalPosValid(portalPos))
                 return false;
 
-            portals[index].PortalPos = portalPos;
+            portals[portalPos.Index].PortalPos = portalPos;
 
             RemoveWarps(); // remove old (sanitize for active multiplayer)
             CreateWarps(); // create new based on new portalPos
@@ -101,16 +100,9 @@ namespace MultiplayerPortalGuns
             return true;
         }
 
-        PortalPosition GetPortalPosition()
+        PortalPosition GetPortalPosition(int index)
         {
-            PortalPosition portalPos = new PortalPosition
-            {
-                X = Game1.getMouseX(),
-                Y = Game1.getMouseY(),
-                LocationName = Game1.currentLocation.Name
-            };
-
-            return portalPos;
+            return new PortalPosition(index, this.name, Game1.getMouseX(), Game1.getMouseY(), Game1.currentLocation.Name);
         }
 
         bool IsPortalPosValid(PortalPosition portalPos)

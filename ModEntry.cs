@@ -18,7 +18,7 @@ namespace MultiplayerPortalGuns
         //public LocationPortals LocationPortals = new LocationPortals();
         LocationPortals PortalTable = new LocationPortals();
 
-        public Dictionary<string, List<Portal>> locationPortals = new Dictionary<string, List<Portal>>();
+        public Dictionary<string, List<PortalPosition>> locationPortals = new Dictionary<string, List<PortalPosition>>();
         //public Dictionary<int, string> portalsLocation = new Dictionary<int, string>();
 
         public override void Entry(IModHelper helper)
