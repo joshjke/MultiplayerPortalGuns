@@ -35,7 +35,7 @@ namespace MultiplayerPortalGuns
             this.LocationName = "";
         }
 
-        public PortalPosition(int index, string uniqueName, int playerIndex int X, int Y, string LocationName)
+        public PortalPosition(int index, string uniqueName, int playerIndex, int X, int Y, string LocationName)
         {
             this.Index = index;
             this.Id = GenerateId(uniqueName);

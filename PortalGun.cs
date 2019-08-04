@@ -1,15 +1,4 @@
-﻿using Microsoft.Xna.Framework.Graphics;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-using PyTK.Extensions;
-using PyTK.Types;
-using PyTK.CustomElementHandler;
-using PyTK.CustomTV;
-using Microsoft.Xna.Framework;
+﻿
 using StardewValley;
 
 namespace MultiplayerPortalGuns
@@ -22,7 +11,7 @@ namespace MultiplayerPortalGuns
 
         Portal[] portals = new Portal[2];
 
-        PortalGun(string Name, int PlayerIndex)
+        public PortalGun(string Name, int PlayerIndex)
         {
             this.Name = Name;
             this.PlayerIndex = PlayerIndex;
@@ -37,25 +26,6 @@ namespace MultiplayerPortalGuns
             }
         }
 
-        PortalGun ReassignPortals(PortalGun portalGun)
-        {
-            //CreatePortal(portalGun.portals[0])
-            return portalGun;
-        }
-
-        void AddWarps()
-        {
-            // (sanitize for active multiplayer)
-            for (int i = 0; i < 2; i++)
-            {
-                if (portals[0].Warp != null)
-                {
-                    // if (Game1.getLocationFromName(portals[i].portalPos.locationName) == Game1.currentLocation) // dirty multiplayer line
-                    Game1.getLocationFromName(portals[i].PortalPos.LocationName).warps.Add(portals[i].Warp);
-                }
-            }
-        }
-
         public void RemovePortals()
         {
             RemoveWarps();
@@ -64,20 +34,13 @@ namespace MultiplayerPortalGuns
                 portals[i].PortalPos.LocationName = null;
             }
         }
-        /// <summary>
-        /// Helper function for RemovePortals(). Loops through portals array
-        /// </summary>
+
         void RemoveWarps()
         {
             // (sanitize for active multiplayer)
             for (int i = 0; i < 2; i++)
-            {
-                if (portals[i].Warp != null)
-                {
-                    Game1.getLocationFromName(portals[i].PortalPos.LocationName).warps.Remove(portals[i].Warp);
-                    portals[i].Warp = null;
-                }
-            }
+                portals[i].Warp = null;
+
         }
 
         public Warp GetWarp(int index)
@@ -86,33 +49,44 @@ namespace MultiplayerPortalGuns
         }
 
 
-        bool CreatePortal(int index)
+        public bool CreatePortal(int index)
         {
             PortalPosition portalPos = GetPortalPosition(index);
+
             return AddPortal(portalPos);
         }
 
         public bool AddPortal(PortalPosition portalPos)
         {
             // sanitize for multiplayer
-            if (!IsPortalPosValid(portalPos))
+            if (!ValidPortalPos(portalPos))
                 return false;
 
             portals[portalPos.Index].PortalPos = portalPos;
 
-            RemoveWarps(); // remove old (sanitize for active multiplayer)
+            RemoveWarps(); // set warps to null
             CreateWarps(); // create new based on new portalPos
-            AddWarps(); // add warps to map (sanitize for active multiplayer)
 
             return true;
         }
 
-        PortalPosition GetPortalPosition(int index)
+        public PortalPosition GetPortal(int index)
         {
-            return new PortalPosition(index, this.Name, this.PlayerIndex, Game1.getMouseX(), Game1.getMouseY(), Game1.currentLocation.Name);
+            return portals[index].PortalPos;
         }
 
-        bool IsPortalPosValid(PortalPosition portalPos)
+        public PortalPosition GetPortalPosition(int index)
+        {
+            
+            PortalPosition portal = new PortalPosition(index, this.Name, this.PlayerIndex, Game1.getMouseX(), Game1.getMouseY(), Game1.currentLocation.Name);
+            if (ValidPortalPos(portal))
+                return portal;
+
+            else
+                return null;
+        }
+
+        private bool ValidPortalPos(PortalPosition portalPos)
         {
             return Game1.getLocationFromName(portalPos.LocationName).isTileLocationTotallyClearAndPlaceable(portalPos.X, portalPos.Y)
                 && Game1.getLocationFromName(portalPos.LocationName).isTileLocationTotallyClearAndPlaceable(portalPos.X + 1, portalPos.Y);

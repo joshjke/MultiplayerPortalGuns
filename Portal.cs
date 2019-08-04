@@ -1,5 +1,6 @@
 ﻿using StardewValley;
-using System;
+
+using xTile.Tiles;
 
 namespace MultiplayerPortalGuns
 {
@@ -11,5 +12,6 @@ namespace MultiplayerPortalGuns
         /// <summary> Used to keep track of the active/inactive Warp </summary>
         public Warp Warp { get; set; }
 
+        public Tile OldTile { get; set; }
     }
 }
