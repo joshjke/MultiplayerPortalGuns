@@ -113,7 +113,7 @@ namespace MultiplayerPortalGuns
                 PortalGuns[portal.PlayerIndex].AddPortal(portal);
                 // add Warp tile into location
                 Game1.getLocationFromName(portal.LocationName).warps.Add(PortalGuns[portal.PlayerIndex].GetWarp(portal.Index));
-                // TODO: play animation
+
             }
 
         }
