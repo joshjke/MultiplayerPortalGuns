@@ -48,14 +48,6 @@ namespace MultiplayerPortalGuns
             return portals[index].Warp;
         }
 
-
-        public bool CreatePortal(int index)
-        {
-            PortalPosition portalPos = GetPortalPosition(index);
-
-            return AddPortal(portalPos);
-        }
-
         public bool AddPortal(PortalPosition portalPos)
         {
             // sanitize for multiplayer

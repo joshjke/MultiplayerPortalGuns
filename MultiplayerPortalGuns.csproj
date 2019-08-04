@@ -46,7 +46,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="LocationPortals.cs" />
+    <Compile Include="LocationUpdater.cs" />
+    <Compile Include="ModConfig.cs" />
     <Compile Include="ModEntry.cs" />
     <Compile Include="PortalGun.cs" />
     <Compile Include="Portal.cs" />
