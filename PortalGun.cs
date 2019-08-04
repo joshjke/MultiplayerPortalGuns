@@ -16,19 +16,22 @@ namespace MultiplayerPortalGuns
 {
    class PortalGun
     {
-        private string name { get; }
+        private string Name { get; }
+
+        private int PlayerIndex { get; }
 
         Portal[] portals = new Portal[2];
 
-        PortalGun(string name)
+        PortalGun(string Name, int PlayerIndex)
         {
-            this.name = name;
+            this.Name = Name;
+            this.PlayerIndex = PlayerIndex;
 
             for (int i = 0; i < 2; i++)
             {
                 portals[i] = new Portal
                 {
-                    PortalPos = new PortalPosition(i, this.name),
+                    PortalPos = new PortalPosition(i, this.Name, this.PlayerIndex),
                     Warp = null
                 };
             }
@@ -77,7 +80,11 @@ namespace MultiplayerPortalGuns
             }
         }
 
-        
+        public Warp GetWarp(int index)
+        {
+            return portals[index].Warp;
+        }
+
 
         bool CreatePortal(int index)
         {
@@ -102,7 +109,7 @@ namespace MultiplayerPortalGuns
 
         PortalPosition GetPortalPosition(int index)
         {
-            return new PortalPosition(index, this.name, Game1.getMouseX(), Game1.getMouseY(), Game1.currentLocation.Name);
+            return new PortalPosition(index, this.Name, this.PlayerIndex, Game1.getMouseX(), Game1.getMouseY(), Game1.currentLocation.Name);
         }
 
         bool IsPortalPosValid(PortalPosition portalPos)

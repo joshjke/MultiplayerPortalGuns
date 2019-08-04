@@ -11,7 +11,10 @@ namespace MultiplayerPortalGuns
         /// PortalPosition from Lists </summary>
         public int Id { get; set; }
 
+        public bool Modified { get; set; } = true;
+        public bool Placed { get; set; } = false;
         public int Index { get; set; }
+        public int PlayerIndex { get; set; }
         /// <summary> X tile position </summary>
         public int X { get; set; }
         /// <summary> Y tile position </summary>
@@ -19,18 +22,24 @@ namespace MultiplayerPortalGuns
         /// <summary> LocationName of Portal's location</summary>
         public string LocationName { get; set; }
 
+        /*public PortalPosition(int Id)
+        {
+            this.Id = Id;
+        }*/
 
-        public PortalPosition(int index, string uniqueName)
+        public PortalPosition(int index, string uniqueName, int playerIndex)
         {
             this.Index = index;
             this.Id = GenerateId(uniqueName);
+            this.PlayerIndex = playerIndex;
             this.LocationName = "";
         }
 
-        public PortalPosition(int index, string uniqueName, int X, int Y, string LocationName)
+        public PortalPosition(int index, string uniqueName, int playerIndex int X, int Y, string LocationName)
         {
             this.Index = index;
             this.Id = GenerateId(uniqueName);
+            this.PlayerIndex = playerIndex;
             this.X = X;
             this.Y = Y;
             this.LocationName = LocationName;
