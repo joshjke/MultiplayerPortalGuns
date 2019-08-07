@@ -4,10 +4,13 @@ using PyTK.CustomElementHandler;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
+using StardewValley.Locations;
 using System;
 
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using xTile.Tiles;
 
 namespace MultiplayerPortalGuns
 {
@@ -29,6 +32,8 @@ namespace MultiplayerPortalGuns
         LocationUpdater<PortalPosition> PortalQueue = new LocationUpdater<PortalPosition>();
         LocationUpdater<Warp> RemovalQueue = new LocationUpdater<Warp>();
 
+        private string TileSheetPath;
+
 
         public override void Entry(IModHelper helper)
         {
@@ -36,6 +41,8 @@ namespace MultiplayerPortalGuns
 
             Directory.CreateDirectory(
                 $"{this.Helper.DirectoryPath}{Path.DirectorySeparatorChar}Data{Path.DirectorySeparatorChar}");
+
+            TileSheetPath = this.Helper.Content.GetActualAssetKey("PortalsAnimated3.png", ContentSource.ModFolder);
 
             helper.Events.GameLoop.SaveLoaded += this.AfterLoad;
             helper.Events.Player.Warped += this.Warped;
@@ -57,7 +64,6 @@ namespace MultiplayerPortalGuns
 
             else if (e.Button.IsUseToolButton() || e.Button.IsActionButton())
                 PortalSpawner(e);
-
 
             // Retract portals of current portal gun
             else if (e.Button.ToString().ToLower() == this.config.RetractPortals.ToLower())
@@ -124,10 +130,16 @@ namespace MultiplayerPortalGuns
 
         private void Multiplayer_ModMessageReceived(object sender, ModMessageReceivedEventArgs e)
         {
-            if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "AddPortal")
+            // Message from Host to targeted Peer to give PortalTable to Queue
+            if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "CreateQueue" + this.PlayerIndex)
+                CreateQueue(e.ReadAs<LocationUpdater<PortalPosition>>());
+
+            // Message from any player to add a portal to the game
+            else if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "AddPortal")
                 EnqueuePortal(e.ReadAs<PortalPosition>());
-            
-            else if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "PlayerNumber")
+
+            // Message from host to targeted Peer to assign PlayerIndex
+            else if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "PlayerIndex" + Game1.player.UniqueMultiplayerID)
                 LoadPortalGuns(e.ReadAs<int>());
 
             else if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "RetractPortals")
@@ -135,9 +147,14 @@ namespace MultiplayerPortalGuns
 
         }
 
+        private void CreateQueue(LocationUpdater<PortalPosition> PortalQueue)
+        {
+            this.PortalQueue = PortalQueue;
+        }
+
         private void EnqueuePortal(PortalPosition portal)
         {
-            if (portal.LocationName == Game1.currentLocation.Name)
+            if (Context.IsMainPlayer || portal.LocationName == Game1.currentLocation.Name)
             {
                 PortalQueue.RemoveItem(portal);
                 PortalTable.AddItem(portal.LocationName, portal);
@@ -148,7 +165,43 @@ namespace MultiplayerPortalGuns
 
         private void Warped(object sender, WarpedEventArgs e)
         {
+
             UpdateLocationsPortals(e.NewLocation.Name);
+
+            if (Context.IsMainPlayer)
+            {
+                if (!(e.NewLocation is MineShaft mine))
+                    return;
+
+                if (mine.mineLevel == Game1.player.deepestMineLevel)
+                    return;
+
+                // deepestMineLevel has changed
+                LoadMinePortals();
+            }
+            else
+            {
+                LoadTileSheet(e.NewLocation);
+            }
+        }
+
+        private void LoadTileSheet(GameLocation location)
+        {
+            // Add the tilesheet.
+            TileSheet tileSheet = new TileSheet(
+               id: "z_portal-spritesheet", // a unique ID for the tilesheet
+               map: location.map,
+               imageSource: TileSheetPath,
+               sheetSize: new xTile.Dimensions.Size(800, 16), // the pixel size of your tilesheet image.
+               tileSize: new xTile.Dimensions.Size(16, 16) // should always be 16x16 for maps
+            );
+
+            if (location != null && location.map != null && tileSheet != null)
+            {
+                this.Monitor.Log("adding and loading tilesheet for location: " + location.Name, LogLevel.Debug);
+                location.map.AddTileSheet(tileSheet);// Multiplayer load error here
+                location.map.LoadTileSheets(Game1.mapDisplayDevice);
+            }
         }
 
         private void UpdateLocationsPortals(string newLocation)
@@ -177,7 +230,7 @@ namespace MultiplayerPortalGuns
                 return false;
 
             // if existing portal exists in current map
-            if (Game1.currentLocation.Name == PortalTable.GetLocationName(portal.Id))
+            if (Context.IsMainPlayer || Game1.currentLocation.Name == PortalTable.GetLocationName(portal.Id))
             {
                 // remove warp
                 Game1.getLocationFromName(PortalTable.GetLocationName(portal.Id))
@@ -199,7 +252,7 @@ namespace MultiplayerPortalGuns
             if (!RemovalQueue.LocationToList.ContainsKey(locationName))
                 return false;
 
-            if (locationName == Game1.currentLocation.Name)
+            if (Context.IsMainPlayer || locationName == Game1.currentLocation.Name)
             {
                 Game1.currentLocation.warps.Remove(warp);
                 RemovalQueue.RemoveItem(warp);
@@ -249,16 +302,21 @@ namespace MultiplayerPortalGuns
 
         private void Multiplayer_PeerContextReceived(object sender, PeerContextReceivedEventArgs e)
         {
-            if (Context.IsMainPlayer)
+            if (!Context.IsMainPlayer)
+                return;
+
+            if (!PlayerList.Contains(e.Peer.PlayerID))
             {
-                if (!PlayerList.Contains(e.Peer.PlayerID))
-                {
-                    PlayerList.Add(e.Peer.PlayerID);
-                    int message = PlayerList.Count;
-                    this.Helper.Multiplayer.SendMessage(message, "PlayerNumber", modIDs: new[] { this.ModManifest.UniqueID });
-                    //this.Monitor.Log("SENT retract portal json", LogLevel.Debug);
-                }
+                PlayerList.Add(e.Peer.PlayerID);
+                int PlayerIndex = PlayerList.Count;
+                this.Helper.Multiplayer.SendMessage(PlayerIndex, "PlayerIndex" + e.Peer.PlayerID, modIDs: new[] { this.ModManifest.UniqueID });
+                //this.Monitor.Log("SENT retract portal json", LogLevel.Debug);
             }
+
+            LocationUpdater<PortalPosition> TableMessage = this.PortalTable;
+
+            this.Helper.Multiplayer.SendMessage(TableMessage, "CreateQueue" + PlayerList.IndexOf(e.Peer.PlayerID), 
+                modIDs: new[] { this.ModManifest.UniqueID });
         }
 
         private void AfterLoad(object sender, EventArgs e)
@@ -268,8 +326,12 @@ namespace MultiplayerPortalGuns
                 PlayerIndex = 1;
                 PlayerList.Add(0);
                 LoadPortalGuns(1);
+
+                LoadPortalTextures();
+                LoadMinePortals();
             }
 
+            // TODO LoadPortalSaves();
         }
 
         private void LoadPortalGuns(int playerNumber)
@@ -285,6 +347,61 @@ namespace MultiplayerPortalGuns
 
                 PortalGuns[i] = new PortalGun(portalGunId, i);
 
+            }
+        }
+
+        private void LoadPortalTextures()
+        {
+            foreach (GameLocation location in GetLocations())
+            {
+                // Add the tilesheet.
+                TileSheet tileSheet = new TileSheet(
+                   id: "z_portal-spritesheet", // a unique ID for the tilesheet
+                   map: location.map,
+                   imageSource: TileSheetPath,
+                   sheetSize: new xTile.Dimensions.Size(800, 16), // the pixel size of your tilesheet image.
+                   tileSize: new xTile.Dimensions.Size(16, 16) // should always be 16x16 for maps
+                );
+
+                if (location != null && location.map != null && tileSheet != null)
+                {
+                    this.Monitor.Log("adding and loading tilesheet in all maps", LogLevel.Debug);
+                    location.map.AddTileSheet(tileSheet);// Multiplayer load error here
+                    location.map.LoadTileSheets(Game1.mapDisplayDevice);
+                }
+            }
+
+        }
+
+        /// <summary>Get all game locations.</summary>
+        public static IEnumerable<GameLocation> GetLocations()
+        {
+            return Game1.locations
+                .Concat(
+                    from location in Game1.locations.OfType<BuildableGameLocation>()
+                    from building in location.buildings
+                    where building.indoors.Value != null
+                    select building.indoors.Value
+                );
+        }
+
+        private void LoadMinePortals()
+        {
+            int mineLevel = Game1.player.deepestMineLevel;
+            for (int i = 1; i <= mineLevel; i++)
+            {
+                GameLocation location = Game1.getLocationFromName($"UndergroundMine{i}");
+
+                // Add the tilesheet.
+                TileSheet tileSheet = new TileSheet(
+                   id: "z_portal-spritesheet", // a unique ID for the tilesheet
+                   map: location.map,
+                   imageSource: TileSheetPath,
+                   sheetSize: new xTile.Dimensions.Size(800, 16), // the pixel size of your tilesheet image.
+                   tileSize: new xTile.Dimensions.Size(16, 16) // should always be 16x16 for maps
+                );
+                location.map.AddTileSheet(tileSheet);
+                location.map.LoadTileSheets(Game1.mapDisplayDevice);
             }
         }
 
