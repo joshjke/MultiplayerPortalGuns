@@ -53,7 +53,39 @@ namespace MultiplayerPortalGuns
 
         private void AfterLoad(object sender, SaveLoadedEventArgs e)
         {
+            PortalTable = new LocationUpdater<PortalPosition>();
+            PortalQueue = new LocationUpdater<PortalPosition>();
+            RemovalQueue = new LocationUpdater<Warp>();
 
+            this.Monitor.Log("hitting after load, SaveLoadedEventArgs");
+
+            if (Context.IsMainPlayer)
+            {
+                PlayerIndex = 1;
+                PlayerList.Add(0);
+                LoadPortalGuns(1);
+
+                LoadPortalTextures();
+                LoadMinePortals();
+            }
+            
+            // TODO LoadPortalSaves();
+        }
+
+        private void AfterLoad(object sender, EventArgs e)
+        {
+            this.Monitor.Log("hitting after load, eventArs");
+            if (Context.IsMainPlayer)
+            {
+                PlayerIndex = 1;
+                PlayerList.Add(0);
+                LoadPortalGuns(1);
+
+                LoadPortalTextures();
+                LoadMinePortals();
+            }
+
+            // TODO LoadPortalSaves();
         }
 
         private void Input_ButtonPressed(object sender, ButtonPressedEventArgs e)
@@ -95,7 +127,7 @@ namespace MultiplayerPortalGuns
 
         }
 
-        private void PortalSpawner (ButtonPressedEventArgs e)
+        private void PortalSpawner(ButtonPressedEventArgs e)
         {
             if (Game1.menuUp || Game1.activeClickableMenu != null || Game1.isFestival()
                 || Game1.player.ActiveObject == null || Game1.player.CurrentItem.DisplayName != "Portal Gun")
@@ -107,11 +139,19 @@ namespace MultiplayerPortalGuns
 
             else if (e.Button.IsActionButton())
                 index = 1;
+            // debugstuff
+            Game1.switchToolAnimation();
+
 
             PortalPosition portal = PortalGuns[PlayerIndex].GetPortalPosition(index);
 
+
             if (portal == null)
+            {
+                this.Monitor.Log("portal is null", LogLevel.Debug);
+                //Game1.currentLocation.playSoundAt("debuffSpell", Game1.player.getTileLocation());
                 return;
+            }
 
             PortalQueue.RemoveItem(portal);
             RemovePortal(portal);
@@ -122,7 +162,6 @@ namespace MultiplayerPortalGuns
             this.Helper.Multiplayer.SendMessage(portal, "AddPortal", modIDs: new[] { this.ModManifest.UniqueID });
 
             // Bells and whistles
-            Game1.switchToolAnimation();
             Game1.currentLocation.playSoundAt("debuffSpell", Game1.player.getTileLocation());
 
         }
@@ -198,7 +237,7 @@ namespace MultiplayerPortalGuns
 
             if (location != null && location.map != null && tileSheet != null)
             {
-                this.Monitor.Log("adding and loading tilesheet for location: " + location.Name, LogLevel.Debug);
+                //this.Monitor.Log("adding and loading tilesheet for location: " + location.Name, LogLevel.Debug);
                 location.map.AddTileSheet(tileSheet);// Multiplayer load error here
                 location.map.LoadTileSheets(Game1.mapDisplayDevice);
             }
@@ -220,7 +259,10 @@ namespace MultiplayerPortalGuns
         private void DequeuePortalTable(List<PortalPosition> PortalsToAdd)
         {
             // remove existing portals's warps and table references
-            foreach (PortalPosition portal in PortalsToAdd)
+            if (PortalsToAdd == null)
+                return;
+
+            foreach (PortalPosition portal in PortalsToAdd) // host failure here Object reference not set to an instance of an object
                 RemovePortal(portal);
         }
         private bool RemovePortal(PortalPosition portal)
@@ -279,6 +321,8 @@ namespace MultiplayerPortalGuns
 
         private void AddPortals(List<PortalPosition> PortalsToAdd)
         {
+            if (PortalsToAdd == null)
+                return;
             foreach (PortalPosition portal in PortalsToAdd)
                 AddPortal(portal);
         }
@@ -292,6 +336,9 @@ namespace MultiplayerPortalGuns
             PortalGuns[portal.PlayerIndex].AddPortal(portal);
 
             // add Warp tile into location
+            if (PortalGuns[portal.PlayerIndex].GetWarp(portal.Index) == null)
+                return false;
+
             Game1.getLocationFromName(Game1.currentLocation.Name).warps
                 .Add(PortalGuns[portal.PlayerIndex].GetWarp(portal.Index));
 
@@ -319,20 +366,7 @@ namespace MultiplayerPortalGuns
                 modIDs: new[] { this.ModManifest.UniqueID });
         }
 
-        private void AfterLoad(object sender, EventArgs e)
-        {
-            if (Context.IsMainPlayer)
-            {
-                PlayerIndex = 1;
-                PlayerList.Add(0);
-                LoadPortalGuns(1);
 
-                LoadPortalTextures();
-                LoadMinePortals();
-            }
-
-            // TODO LoadPortalSaves();
-        }
 
         private void LoadPortalGuns(int playerNumber)
         {
@@ -365,7 +399,7 @@ namespace MultiplayerPortalGuns
 
                 if (location != null && location.map != null && tileSheet != null)
                 {
-                    this.Monitor.Log("adding and loading tilesheet in all maps", LogLevel.Debug);
+                    //this.Monitor.Log("adding and loading tilesheet in all maps", LogLevel.Debug);
                     location.map.AddTileSheet(tileSheet);// Multiplayer load error here
                     location.map.LoadTileSheets(Game1.mapDisplayDevice);
                 }

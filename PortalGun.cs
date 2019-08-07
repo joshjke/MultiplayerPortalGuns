@@ -70,9 +70,14 @@ namespace MultiplayerPortalGuns
         public PortalPosition GetPortalPosition(int index)
         {
             
-            PortalPosition portal = new PortalPosition(index, this.Name, this.PlayerIndex, Game1.getMouseX(), Game1.getMouseY(), Game1.currentLocation.Name);
+            PortalPosition portal = new PortalPosition(index, this.Name, this.PlayerIndex, 
+                (int)Game1.currentCursorTile.X, (int)Game1.currentCursorTile.Y, Game1.currentLocation.Name);
             if (ValidPortalPos(portal))
+            {
+                //portals[index].PortalPos = portal;
+                //CreateWarps();
                 return portal;
+            }
 
             else
                 return null;
