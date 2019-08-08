@@ -5,18 +5,22 @@ namespace MultiplayerPortalGuns
 {
    class PortalGun
     {
+        public static int MAX_PORTALS;
         private string Name { get; }
 
         private int PlayerIndex { get; }
 
-        Portal[] portals = new Portal[2];
+        Portal[] portals;
 
-        public PortalGun(string Name, int PlayerIndex)
+        public PortalGun(string Name, int PlayerIndex, int max_portals)
         {
             this.Name = Name;
             this.PlayerIndex = PlayerIndex;
+            MAX_PORTALS = max_portals;
 
-            for (int i = 0; i < 2; i++)
+            portals = new Portal[MAX_PORTALS];
+
+            for (int i = 0; i < MAX_PORTALS; i++)
             {
                 portals[i] = new Portal
                 {
@@ -29,7 +33,7 @@ namespace MultiplayerPortalGuns
         public void RemovePortals()
         {
             RemoveWarps();
-            for (int i = 0; i < 2; i++)
+            for (int i = 0; i < MAX_PORTALS; i++)
             {
                 portals[i].PortalPos.LocationName = null;
             }
@@ -38,9 +42,8 @@ namespace MultiplayerPortalGuns
         void RemoveWarps()
         {
             // (sanitize for active multiplayer)
-            for (int i = 0; i < 2; i++)
+            for (int i = 0; i < MAX_PORTALS; i++)
                 portals[i].Warp = null;
-
         }
 
         public Warp GetWarp(int index)
@@ -65,6 +68,11 @@ namespace MultiplayerPortalGuns
         public PortalPosition GetPortal(int index)
         {
             return portals[index].PortalPos;
+        }
+
+        public Portal[] GetPortals()
+        {
+            return this.portals;
         }
 
         public PortalPosition GetPortalPosition(int index)
@@ -93,7 +101,7 @@ namespace MultiplayerPortalGuns
         int CreateWarps()
         {
             int counter = 0;
-            for (int i = 0; i < 2; i++)
+            for (int i = 0; i < MAX_PORTALS; i++)
             {
                 if (CreateWarp(i))
                     ++counter;
@@ -125,6 +133,11 @@ namespace MultiplayerPortalGuns
         private int GetTargetIndex(int index)
         {
             return index == 0 ? 1 : 0;
+        }
+
+        public Portal GetTargetPortal(int index)
+        {
+            return portals[GetTargetIndex(index)];
         }
     }
 }

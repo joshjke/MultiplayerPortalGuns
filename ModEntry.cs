@@ -111,7 +111,7 @@ namespace MultiplayerPortalGuns
                 RemoveWarp(PortalGuns[portalGunIndex].GetPortal(i).LocationName,
                     PortalGuns[portalGunIndex].GetWarp(i));
                 // Handle Table
-                RemovePortal(PortalGuns[portalGunIndex].GetPortal(i));
+                RemovePortals(portalGunIndex);
             }
 
             PortalGuns[portalGunIndex].RemovePortals();
@@ -152,9 +152,10 @@ namespace MultiplayerPortalGuns
                 //Game1.currentLocation.playSoundAt("debuffSpell", Game1.player.getTileLocation());
                 return;
             }
+            //SpawnPortals(index);
 
             PortalQueue.RemoveItem(portal);
-            RemovePortal(portal);
+            RemovePortals(PlayerIndex);
             AddPortal(portal);
 
             // Tile animation and stuff
@@ -263,29 +264,38 @@ namespace MultiplayerPortalGuns
                 return;
 
             foreach (PortalPosition portal in PortalsToAdd) // host failure here Object reference not set to an instance of an object
-                RemovePortal(portal);
+                RemovePortals(portal.PlayerIndex);
         }
-        private bool RemovePortal(PortalPosition portal)
+
+        private bool RemovePortals(int gunIndex)
+        {
+            foreach (Portal removablePortal in PortalGuns[gunIndex].GetPortals())
+            {
+                if (RemovePortal(removablePortal) == false)
+                    return false;
+            }
+            return true;
+        }
+        private bool RemovePortal(Portal portal)
         {
             // if portal is not in the tables
-            if (!PortalTable.HashCodeToLocation.ContainsKey(portal.Id))
+            if (!PortalTable.HashCodeToLocation.ContainsKey(portal.PortalPos.Id))
                 return false;
 
             // if existing portal exists in current map
-            if (Context.IsMainPlayer || Game1.currentLocation.Name == PortalTable.GetLocationName(portal.Id))
+            if (Context.IsMainPlayer || Game1.currentLocation.Name == PortalTable.GetLocationName(portal.PortalPos.Id))
             {
                 // remove warp
-                Game1.getLocationFromName(PortalTable.GetLocationName(portal.Id))
-                    .warps.Remove(PortalGuns[portal.PlayerIndex].GetWarp(portal.Index));
+                Game1.currentLocation.warps.Remove(portal.Warp);
                 /* 
                  * TODO: replace tile here
                  */
             }
             else // portal exists in map, but not current location
-                RemovalQueue.AddItem(portal.LocationName, PortalGuns[PlayerIndex].GetWarp(portal.Index));
+                RemovalQueue.AddItem(portal.PortalPos.LocationName, portal.Warp);
 
+            PortalTable.RemoveItem(portal.PortalPos);
 
-            PortalTable.RemoveItem(portal);
             return true;
         }
 
@@ -342,7 +352,20 @@ namespace MultiplayerPortalGuns
             Game1.getLocationFromName(Game1.currentLocation.Name).warps
                 .Add(PortalGuns[portal.PlayerIndex].GetWarp(portal.Index));
 
+            if (Game1.currentLocation.Name == PortalGuns[portal.PlayerIndex].GetTargetPortal(portal.Index).PortalPos.LocationName)
+            {
+                Game1.getLocationFromName(Game1.currentLocation.Name).warps
+                    .Add(PortalGuns[portal.PlayerIndex].GetTargetPortal(portal.Index).Warp);
+            }
+            else
+            {
+                
+            }
             PortalTable.AddItem(portal.LocationName, portal);
+
+            Game1.getLocationFromName(Game1.currentLocation.Name).removeTile(portal.X, portal.Y, "Buildings");
+
+
 
             return true;
         }
@@ -379,7 +402,7 @@ namespace MultiplayerPortalGuns
                 if (i == playerNumber)
                     PortalGunObjects[i].craftingData = new CraftingData("Portal Gun", "388 1");
 
-                PortalGuns[i] = new PortalGun(portalGunId, i);
+                PortalGuns[i] = new PortalGun(portalGunId, i, MAX_PORTALS);
 
             }
         }
