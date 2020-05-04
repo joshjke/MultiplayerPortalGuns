@@ -1,0 +1,8 @@
+C:\Users\JoshJ\source\repos\MultiplayerPortalGuns\obj\Debug\MultiplayerPortalGuns.csprojAssemblyReference.cache
+C:\Users\JoshJ\source\repos\MultiplayerPortalGuns\obj\Debug\MultiplayerPortalGuns.csproj.CoreCompileInputs.cache
+C:\Users\JoshJ\source\repos\MultiplayerPortalGuns\bin\Debug\MultiplayerPortalGuns.dll
+C:\Users\JoshJ\source\repos\MultiplayerPortalGuns\bin\Debug\MultiplayerPortalGuns.pdb
+C:\Users\JoshJ\source\repos\MultiplayerPortalGuns\bin\Debug\PyTK.dll
+C:\Users\JoshJ\source\repos\MultiplayerPortalGuns\obj\Debug\MultiplayerPortalGuns.csproj.CopyComplete
+C:\Users\JoshJ\source\repos\MultiplayerPortalGuns\obj\Debug\MultiplayerPortalGuns.dll
+C:\Users\JoshJ\source\repos\MultiplayerPortalGuns\obj\Debug\MultiplayerPortalGuns.pdb
