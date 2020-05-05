@@ -51,6 +51,7 @@ namespace MultiplayerPortalGuns
             return new StringBuilder()
                 .Append(uniqueName)
                 .Append(this.Index)
+                .ToString()
                 .GetHashCode();
         }
 

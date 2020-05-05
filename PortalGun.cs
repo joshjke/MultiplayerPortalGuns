@@ -5,22 +5,22 @@ namespace MultiplayerPortalGuns
 {
    class PortalGun
     {
-        public static int MAX_PORTALS;
+        private int MaxPortals;
         private string Name { get; }
 
         private int PlayerIndex { get; }
 
         Portal[] portals;
 
-        public PortalGun(string Name, int PlayerIndex, int max_portals)
+        public PortalGun(string Name, int PlayerIndex, int MaxPortals)
         {
             this.Name = Name;
             this.PlayerIndex = PlayerIndex;
-            MAX_PORTALS = max_portals;
+            this.MaxPortals = MaxPortals;
 
-            portals = new Portal[MAX_PORTALS];
+            portals = new Portal[MaxPortals];
 
-            for (int i = 0; i < MAX_PORTALS; i++)
+            for (int i = 0; i < MaxPortals; i++)
             {
                 portals[i] = new Portal
                 {
@@ -33,7 +33,7 @@ namespace MultiplayerPortalGuns
         public void RemovePortals()
         {
             RemoveWarps();
-            for (int i = 0; i < MAX_PORTALS; i++)
+            for (int i = 0; i < MaxPortals; i++)
             {
                 portals[i].PortalPos.LocationName = null;
             }
@@ -42,7 +42,7 @@ namespace MultiplayerPortalGuns
         void RemoveWarps()
         {
             // (sanitize for active multiplayer)
-            for (int i = 0; i < MAX_PORTALS; i++)
+            for (int i = 0; i < MaxPortals; i++)
                 portals[i].Warp = null;
         }
 
@@ -53,7 +53,7 @@ namespace MultiplayerPortalGuns
 
         public bool AddPortal(PortalPosition portalPos)
         {
-            // sanitize for multiplayer
+            // sanitization for multiplayer
             if (!ValidPortalPos(portalPos))
                 return false;
 
@@ -101,7 +101,7 @@ namespace MultiplayerPortalGuns
         int CreateWarps()
         {
             int counter = 0;
-            for (int i = 0; i < MAX_PORTALS; i++)
+            for (int i = 0; i < MaxPortals; i++)
             {
                 if (CreateWarp(i))
                     ++counter;
