@@ -53,9 +53,9 @@ namespace MultiplayerPortalGuns
 
         public bool AddPortal(PortalPosition portalPos)
         {
-            // sanitization for multiplayer
+            /*// sanitization for multiplayer
             if (!ValidPortalPos(portalPos))
-                return false;
+                return false;*/
 
             portals[portalPos.Index].PortalPos = portalPos;
 

@@ -31,20 +31,30 @@ namespace MultiplayerPortalGuns
         public PortalPosition(int index, string uniqueName, int playerIndex)
         {
             this.Index = index;
-            this.Id = GenerateId(uniqueName);
             this.PlayerIndex = playerIndex;
             this.LocationName = "";
+            this.Id = GenerateId(uniqueName);
         }
         [JsonConstructor]
         public PortalPosition(int index, string uniqueName, int playerIndex, int X, int Y, string LocationName)
         {
             this.Index = index;
+            this.PlayerIndex = playerIndex;
+            this.X = X;
+            this.Y = Y;
+            this.LocationName = LocationName;
+            this.Id = GenerateId(uniqueName);
+        }
+        /*
+        public PortalPosition(PortalPosition portalPosition)
+        {
+            this.Index = portalPosition.Index;
             this.Id = GenerateId(uniqueName);
             this.PlayerIndex = playerIndex;
             this.X = X;
             this.Y = Y;
             this.LocationName = LocationName;
-        }
+        }*/
 
         private int GenerateId(string uniqueName)
         {
