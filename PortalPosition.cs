@@ -1,5 +1,6 @@
 ﻿
 using Newtonsoft.Json;
+using StardewValley;
 using System;
 using System.Text;
 
@@ -21,7 +22,7 @@ namespace MultiplayerPortalGuns
         /// <summary> Y tile position </summary>
         public int Y { get; set; }
         /// <summary> LocationName of Portal's location</summary>
-        public string LocationName { get; set; }
+        public GameLocation location { get; set; }
 
         /*public PortalPosition(int Id)
         {
@@ -32,38 +33,30 @@ namespace MultiplayerPortalGuns
         {
             this.Index = index;
             this.PlayerIndex = playerIndex;
-            this.LocationName = "";
+            this.location = null;
             this.Id = GenerateId(uniqueName);
         }
         [JsonConstructor]
-        public PortalPosition(int index, string uniqueName, int playerIndex, int X, int Y, string LocationName)
+        public PortalPosition(int index, string uniqueName, int playerIndex, 
+            int X, int Y, GameLocation location)
         {
             this.Index = index;
             this.PlayerIndex = playerIndex;
             this.X = X;
             this.Y = Y;
-            this.LocationName = LocationName;
+            this.location = location;
             this.Id = GenerateId(uniqueName);
         }
-        /*
-        public PortalPosition(PortalPosition portalPosition)
-        {
-            this.Index = portalPosition.Index;
-            this.Id = GenerateId(uniqueName);
-            this.PlayerIndex = playerIndex;
-            this.X = X;
-            this.Y = Y;
-            this.LocationName = LocationName;
-        }*/
 
         private int GenerateId(string uniqueName)
         {
             // assumes index has been set
+            int locationHash = location != null ? location.GetHashCode() : "null".GetHashCode();
             return new StringBuilder()
                 .Append(uniqueName)
                 .Append(this.Index)
                 .Append(this.X).Append(this.Y)
-                .Append(this.LocationName)
+                .Append(locationHash)
                 .ToString()
                 .GetHashCode();
         }

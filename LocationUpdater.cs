@@ -1,4 +1,5 @@
 ﻿
+using StardewValley;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -25,16 +26,16 @@ namespace MultiplayerPortalGuns
     /// <typeparam name="T">Data type for containing map edits, referred to as Item</typeparam>
     internal class LocationUpdater<T>
     {
-        public Dictionary<string, List<T>> LocationToItemList { get; set; }
-        public Dictionary<int, string> ItemToLocation { get; set; }
+        public Dictionary<GameLocation, List<T>> LocationToItemList { get; set; }
+        public Dictionary<int, GameLocation> ItemToLocation { get; set; }
 
         internal LocationUpdater()
         {
-            LocationToItemList = new Dictionary<string, List<T>>();
-            ItemToLocation = new Dictionary<int, string>();
+            LocationToItemList = new Dictionary<GameLocation, List<T>>();
+            ItemToLocation = new Dictionary<int, GameLocation>();
         }
 
-        public bool AddItem(string locationName, T item)
+        public bool AddItem(GameLocation location, T item)
         {
             if (item == null)
                 return false;
@@ -42,18 +43,18 @@ namespace MultiplayerPortalGuns
             RemoveItem(item);
 
             // if location does not have a mapping with an item list
-            if (locationName == null || locationName == "")
+            if (location == null)
                 return false;
-            if (!LocationToItemList.ContainsKey(locationName))
+            if (!LocationToItemList.ContainsKey(location))
             {
                 // add location to dictionary and give it a new item list
-                LocationToItemList.Add(locationName, new List<T>());
+                LocationToItemList.Add(location, new List<T>());
             }
             // add the item to the mapping
-            ItemToLocation.Add(item.GetHashCode(), locationName);
+            ItemToLocation.Add(item.GetHashCode(), location);
 
             // add the item to the Location's item list
-            LocationToItemList[locationName].Add(item);
+            LocationToItemList[location].Add(item);
 
             return true;
         }
@@ -66,9 +67,9 @@ namespace MultiplayerPortalGuns
         /// <returns></returns>
         public T GetItemFromId(T item)
         {
-            if (ItemToLocation.TryGetValue(item.GetHashCode(), out string locationName))
+            if (ItemToLocation.TryGetValue(item.GetHashCode(), out GameLocation location))
             {
-                return LocationToItemList[locationName][LocationToItemList[locationName].IndexOf(item)];
+                return LocationToItemList[location][LocationToItemList[location].IndexOf(item)];
             }
             else
                 return default;
@@ -80,10 +81,10 @@ namespace MultiplayerPortalGuns
         /// </summary>
         /// <param name="locationName">SDV name of the map location</param>
         /// <returns></returns>
-        public List<T> GetItemsInLocation(string locationName)
+        public List<T> GetItemsInLocation(GameLocation location)
         {
             List<T> itemList;
-            if (LocationToItemList.TryGetValue(locationName, out itemList))
+            if (LocationToItemList.TryGetValue(location, out itemList))
                 return itemList;
             else
                 return null;
@@ -114,12 +115,12 @@ namespace MultiplayerPortalGuns
         /// </summary>
         /// <param name="id">The item to get the location from</param>
         /// <returns></returns>
-        public string GetLocationName(int id)
+        public GameLocation GetLocationName(int id)
         {
-            if (ItemToLocation.TryGetValue(id, out string locationName))
-                return locationName;
+            if (ItemToLocation.TryGetValue(id, out GameLocation location))
+                return location;
             else
-                return "";
+                return null;
         }
     }
 

@@ -199,7 +199,7 @@ namespace MultiplayerPortalGuns
                 return false;
 
             // add it to the game location
-            Game1.getLocationFromName(portalPosition.LocationName).warps.Add(warp);
+            portalPosition.location.warps.Add(warp);
             return true;
         }
 
@@ -211,13 +211,13 @@ namespace MultiplayerPortalGuns
                 this.Helper.Multiplayer.SendMessage(portalPosition, "RemoveWarp", modIDs: new[] { this.ModManifest.UniqueID });
                 return false;
             }
-            string locationName = portalPosition.LocationName;
-            if (locationName == "" || locationName == null)
+            if (portalPosition.location == null)
                 return false;
-            GameLocation location = Game1.getLocationFromName(portalPosition.LocationName);
 
             // remove the warp from the location
-            location.warps.Remove(GetWarp(portalPosition));
+            Warp warp = GetWarp(portalPosition);
+            if (warp != null)
+                portalPosition.location.warps.Remove(GetWarp(portalPosition));
 
             return true;
         }
@@ -244,16 +244,16 @@ namespace MultiplayerPortalGuns
         private bool AddPortalSprite(PortalPosition portalPosition)
         {
             AddedPortalSprites.RemoveItem(portalPosition);
-            if (portalPosition.LocationName != Game1.currentLocation.Name)
+            if (portalPosition.location != Game1.currentLocation)
             {
-                AddedPortalSprites.AddItem(portalPosition.LocationName, portalPosition);
+                AddedPortalSprites.AddItem(portalPosition.location, portalPosition);
                 return false;
             }
             else
             {
                 // Add the sprite to the map
-                Layer layer = Game1.getLocationFromName(portalPosition.LocationName).map.GetLayer("Buildings");
-                TileSheet tileSheet = Game1.getLocationFromName(portalPosition.LocationName).map.GetTileSheet("z_portal-spritesheet");
+                Layer layer = portalPosition.location.map.GetLayer("Buildings");
+                TileSheet tileSheet = portalPosition.location.map.GetTileSheet("z_portal-spritesheet");
 
                 layer.Tiles[portalPosition.X, portalPosition.Y] = new StaticTile(
                     layer, tileSheet, BlendMode.Additive, tileIndex: 4 + portalPosition.Index * 5); 
@@ -277,35 +277,35 @@ namespace MultiplayerPortalGuns
 
         public bool RemovePortalSprite(PortalPosition portalPosition)
         {
-            return RemovePortalSprite(portalPosition.LocationName, portalPosition);
+            return RemovePortalSprite(portalPosition.location, portalPosition);
         }
 
-        public bool RemovePortalSprite(string locationName, PortalPosition portalPosition)
+        public bool RemovePortalSprite(GameLocation location, PortalPosition portalPosition)
         {
             // if it has already been added previously (same indices, location, and coords) remove from queue
             AddedPortalSprites.RemoveItem(portalPosition);
 
-            if (locationName != Game1.currentLocation.Name)
+            if (location != Game1.currentLocation)
             {
-                RemovedPortalSprites.AddItem(locationName, portalPosition);
+                RemovedPortalSprites.AddItem(location, portalPosition);
                 return false;
             }
             else // TODO if the OldTiles need to be saved, this needs to be edited
             {
-                Game1.getLocationFromName(locationName).removeTile(portalPosition.X, portalPosition.Y, "Buildings");
+                location.removeTile(portalPosition.X, portalPosition.Y, "Buildings");
                 RemovedPortalSprites.RemoveItem(portalPosition);
             }
             return true;
         }
 
-        private bool RemovePortalSprites(string locationName, List<PortalPosition> portalPositions)
+        private bool RemovePortalSprites(GameLocation location, List<PortalPosition> portalPositions)
         {
             if (portalPositions == null)
                 return false;
             bool allRemoved = true;
             foreach (PortalPosition portalPosition in portalPositions.ToList())
             {
-                if (!RemovePortalSprite(locationName, portalPosition))
+                if (!RemovePortalSprite(location, portalPosition))
                     allRemoved = false;
             }
             return allRemoved;
@@ -356,7 +356,7 @@ namespace MultiplayerPortalGuns
          *****************************************************************************/
         private void Warped(object sender, WarpedEventArgs e)
         {
-            string locationName = e.NewLocation.Name;
+            GameLocation location = e.NewLocation;
             /*if (Context.IsMainPlayer)
             {
                 if (!(e.NewLocation is MineShaft mine))
@@ -373,8 +373,8 @@ namespace MultiplayerPortalGuns
                 LoadTileSheet(e.NewLocation);
             //}
 
-            RemovePortalSprites(locationName, RemovedPortalSprites.GetItemsInLocation(locationName));
-            AddPortalSprites(AddedPortalSprites.GetItemsInLocation(locationName));
+            RemovePortalSprites(location, RemovedPortalSprites.GetItemsInLocation(location));
+            AddPortalSprites(AddedPortalSprites.GetItemsInLocation(location));
         }
 
         /******************************************************************************
