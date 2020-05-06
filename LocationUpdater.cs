@@ -36,10 +36,14 @@ namespace MultiplayerPortalGuns
 
         public bool AddItem(string locationName, T item)
         {
+            if (item == null)
+                return false;
             // Remove the item if it already exists
             RemoveItem(item);
-            
+
             // if location does not have a mapping with an item list
+            if (locationName == null || locationName == "")
+                return false;
             if (!LocationToItemList.ContainsKey(locationName))
             {
                 // add location to dictionary and give it a new item list
@@ -92,6 +96,8 @@ namespace MultiplayerPortalGuns
         /// <returns></returns>
         public bool RemoveItem(T item)
         {
+            if (item == null)
+                return false;
             if (ItemToLocation.ContainsKey(item.GetHashCode()))
             {
                 if (!LocationToItemList[ItemToLocation[item.GetHashCode()]].Remove(item))

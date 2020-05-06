@@ -1,4 +1,5 @@
 ﻿
+using Newtonsoft.Json;
 using System;
 using System.Text;
 
@@ -34,7 +35,7 @@ namespace MultiplayerPortalGuns
             this.PlayerIndex = playerIndex;
             this.LocationName = "";
         }
-
+        [JsonConstructor]
         public PortalPosition(int index, string uniqueName, int playerIndex, int X, int Y, string LocationName)
         {
             this.Index = index;
@@ -51,6 +52,8 @@ namespace MultiplayerPortalGuns
             return new StringBuilder()
                 .Append(uniqueName)
                 .Append(this.Index)
+                .Append(this.X).Append(this.Y)
+                .Append(this.LocationName)
                 .ToString()
                 .GetHashCode();
         }

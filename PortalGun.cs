@@ -65,9 +65,9 @@ namespace MultiplayerPortalGuns
             return true;
         }
 
-        public PortalPosition GetPortal(int index)
+        public Portal GetPortal(int index)
         {
-            return portals[index].PortalPos;
+            return portals[index];
         }
 
         public Portal[] GetPortals()
@@ -111,17 +111,19 @@ namespace MultiplayerPortalGuns
 
         bool CreateWarp(int index)
         {
-            if (portals[index].PortalPos.LocationName == "")
+            if (portals[index].PortalPos.LocationName == ""
+                || portals[index].PortalPos.LocationName == null)
                 return false;
 
             int target = GetTargetIndex(index);
-            if (portals[target].PortalPos.LocationName == "")
+            if (portals[target].PortalPos.LocationName == ""
+                || portals[target].PortalPos.LocationName == null)
                 return false;
 
             portals[index].Warp = new Warp(
                 portals[index].PortalPos.X, 
                 portals[index].PortalPos.Y, 
-                portals[index].PortalPos.LocationName,
+                portals[target].PortalPos.LocationName,
                 portals[target].PortalPos.X + 1, 
                 portals[target].PortalPos.Y,
                 false

@@ -1,17 +1,23 @@
-﻿using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
-using PyTK.CustomElementHandler;
-using StardewModdingAPI;
-using StardewModdingAPI.Events;
-using StardewValley;
-using StardewValley.Locations;
-using System;
-using System.Collections;
+﻿/// Stardew Valley Multiplayer Portal Guns Mod
+/// by Josh Kennedy
+
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+
+using StardewValley;
+using StardewValley.Locations;
+using StardewModdingAPI;
+using StardewModdingAPI.Events;
+
 using xTile.Layers;
 using xTile.Tiles;
+
+using PyTK.CustomElementHandler;
+using xTile.Dimensions;
 
 namespace MultiplayerPortalGuns
 {
@@ -29,8 +35,9 @@ namespace MultiplayerPortalGuns
         PortalGun[] PortalGuns = new PortalGun[MAX_PORTAL_GUNS];
         CustomObjectData[] PortalGunObjects = new CustomObjectData[MAX_PORTAL_GUNS];
 
-        LocationUpdater<PortalPosition> PortalTable = new LocationUpdater<PortalPosition>();
-        LocationUpdater<Warp> WarpRemovalQueue = new LocationUpdater<Warp>();
+        LocationUpdater<PortalPosition> AddedPortalSprites = new LocationUpdater<PortalPosition>();
+        LocationUpdater<PortalPosition> RemovedPortalSprites = new LocationUpdater<PortalPosition>();
+
 
         private string TileSheetPath;
 
@@ -51,43 +58,6 @@ namespace MultiplayerPortalGuns
 
         }
 
-
-        private void AfterLoad(object sender, SaveLoadedEventArgs e)
-        {
-            PortalQueue = new LocationUpdater<PortalPosition>();
-            WarpRemovalQueue = new LocationUpdater<Warp>();
-
-            this.Monitor.Log("hitting after load, SaveLoadedEventArgs");
-
-            if (Context.IsMainPlayer)
-            {
-                PlayerIndex = 1;
-                PlayerList.Add(0);
-                LoadPortalGuns(1);
-
-                LoadPortalTextures();
-                LoadMinePortals();
-            }
-            
-            // TODO LoadPortalSaves();
-        }
-        /* // Not sure why there's a duplicate function, investigate w/ mutliplayer
-        private void AfterLoad(object sender, EventArgs e)
-        {
-            this.Monitor.Log("hitting after load, eventArs");
-            if (Context.IsMainPlayer)
-            {
-                PlayerIndex = 1;
-                PlayerList.Add(0);
-                LoadPortalGuns(1);
-
-                LoadPortalTextures();
-                LoadMinePortals();
-            }
-
-            // TODO LoadPortalSaves();
-        } */
-
         private void Input_ButtonPressed(object sender, ButtonPressedEventArgs e)
         {
 
@@ -103,30 +73,9 @@ namespace MultiplayerPortalGuns
 
         }
 
-        private void RetractPortals(int portalGunIndex)
-        {
-            for (int i = 0; i < MAX_PORTALS; i++)
-            {
-                // Handle Warps
-                RemoveWarp(PortalGuns[portalGunIndex].GetPortal(i).LocationName,
-                    PortalGuns[portalGunIndex].GetWarp(i));
-                // Handle Table
-                RemovePortals(portalGunIndex);
-            }
-
-            PortalGuns[portalGunIndex].RemovePortals();
-
-
-            // Bells and Whistles
-            Game1.switchToolAnimation();
-            Game1.currentLocation.playSoundAt("serpentDie", Game1.player.getTileLocation());
-
-            // Notify players
-            int message = PlayerIndex;
-            this.Helper.Multiplayer.SendMessage(message, "RetractPortals", modIDs: new[] { this.ModManifest.UniqueID });
-
-        }
-
+        /******************************************************************************
+         * Portal Addition and Placement
+         *****************************************************************************/
         private void PortalSpawner(ButtonPressedEventArgs e)
         {
             if (Game1.menuUp || Game1.activeClickableMenu != null || Game1.isFestival()
@@ -148,35 +97,23 @@ namespace MultiplayerPortalGuns
 
             if (portalPos == null)
             {
-                this.Monitor.Log("portal is null", LogLevel.Debug);
+                this.Monitor.Log("portalPosition is null", LogLevel.Debug);
                 //Game1.currentLocation.playSoundAt("debuffSpell", Game1.player.getTileLocation());
                 return;
             }
 
             Portal portal = new Portal(portalPos);
-            
+
             //SpawnPortals(index);
 
-            PortalQueue.RemoveItem(portalPos);
-            RemovePortals(PlayerIndex);
-
-            //AddPortals
+            RemovePortal(PortalGuns[PlayerIndex].GetPortal(index));
             AddPortal(portalPos);
 
+            // Message other players to add the portal
+            this.Helper.Multiplayer.SendMessage(portalPos, "AddPortal",
+               modIDs: new[] { this.ModManifest.UniqueID });
+
             // Tile animation and stuff
-
-            // TODO SAVE OLD TILE HERE
-
-            // Removing old tile
-
-            Game1.getLocationFromName(portalPos.LocationName).removeTile(portalPos.X, portalPos.Y, "Buildings");
-
-            Layer layer = Game1.getLocationFromName(portalPos.LocationName).map.GetLayer("Buildings");
-            TileSheet tileSheet = Game1.getLocationFromName(portalPos.LocationName).map.GetTileSheet("z_portal-spritesheet");
-            // save old tile
-            portal.OldTile = layer.Tiles[portalPos.X, portalPos.Y];
-            // place portal sprite on tile location
-            layer.Tiles[portalPos.X, portalPos.Y] = new StaticTile(layer, tileSheet, BlendMode.Additive, tileIndex:4); // Multiplayer error here "The specified tileSheet is not in the parent map"
 
             // TODO animate the portal spawning
             //PortalAnimationFrame[i] + i * 5
@@ -185,106 +122,185 @@ namespace MultiplayerPortalGuns
 
             // Bells and whistles
             Game1.currentLocation.playSoundAt("debuffSpell", Game1.player.getTileLocation());
-
         }
 
+        //private void OtherPlayerAddedPortal()
 
-
-        private void Multiplayer_ModMessageReceived(object sender, ModMessageReceivedEventArgs e)
+        private void AddPortals(List<PortalPosition> PortalsToAdd)
         {
-            // Message from Host to targeted Peer to give PortalTable to them
-            if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "SetPortalTable" + this.PlayerIndex)
-                SetPortalTable(e.ReadAs<LocationUpdater<PortalPosition>>());
+            if (PortalsToAdd == null)
+                return;
+            foreach (PortalPosition portal in PortalsToAdd.ToList())
+                AddPortal(portal);
+        }
+        /// <summary>
+        /// Places a portal at portalPosition
+        /// Prerequisites: checking for a valid placement position
+        /// </summary>
+        /// <param name="portalPosition">The portal to be placed</param>
+        /// <returns></returns>
+        private bool AddPortal(PortalPosition portalPosition)
+        {
+            // remove the target's warp
+            Portal targetPortal = GetTargetPortal(portalPosition);
+            RemoveWarp(targetPortal.PortalPos);
 
-            // Message from any player to add a portal to the game
-            else if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "AddPortal")
-                EnqueuePortal(e.ReadAs<PortalPosition>());
+            // assign the portal to the gun to handle the targeting warp structure
+            //   but not any of the map placement
+            PortalGuns[portalPosition.PlayerIndex].AddPortal(portalPosition);
+            this.Helper.Multiplayer.SendMessage(targetPortal.PortalPos, "UpdatePortalGun", modIDs: new[] { this.ModManifest.UniqueID });
 
-            // Message from host to targeted Peer to assign PlayerIndex
-            else if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "PlayerIndex" + Game1.player.UniqueMultiplayerID)
-                LoadPortalGuns(e.ReadAs<int>());
+            // add the new target portal's warp and sprites
+            AddWarpsAndSprites(targetPortal);
 
-            else if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "RetractPortals")
-                RetractPortals(e.ReadAs<int>());
+            // add the placed portal's warps and sprites
+            Portal portal = PortalGuns[portalPosition.PlayerIndex].GetPortal(portalPosition.Index);
+            AddWarpsAndSprites(portal);
 
+            return true;
         }
 
-        private void SetPortalTable(LocationUpdater<PortalPosition> PortalTable)
+        private void AddWarpsAndSprites(Portal targetPortal)
         {
-            this.PortalTable = PortalTable;
+            AddWarp(targetPortal.PortalPos);
+            AddPortalSprite(targetPortal.PortalPos);
+            this.Helper.Multiplayer.SendMessage(targetPortal.PortalPos, "AddPortalSprite", modIDs: new[] { this.ModManifest.UniqueID });
         }
 
-        private void EnqueuePortal(PortalPosition portal)
+        public Portal GetTargetPortal(PortalPosition portalPosition)
         {
-            if (Context.IsMainPlayer || portal.LocationName == Game1.currentLocation.Name)
+            return PortalGuns[portalPosition.PlayerIndex]
+                .GetTargetPortal(portalPosition.Index);
+        }
+
+        private bool UpdatePortalGun(PortalPosition portalPosition)
+        {
+            return PortalGuns[portalPosition.PlayerIndex].AddPortal(portalPosition);
+        }
+
+        private bool AddWarp(PortalPosition portalPosition)
+        {
+            // Warps are global, so only have host handle them to avoid duplicates and ghosts
+            if (!Context.IsMainPlayer)
             {
-                PortalQueue.RemoveItem(portal);
-                PortalTable.AddItem(portal.LocationName, portal);
-                // tile animation, and sound
+                this.Helper.Multiplayer.SendMessage(portalPosition, "AddWarp", modIDs: new[] { this.ModManifest.UniqueID });
+                return false;
             }
-            PortalQueue.AddItem(portal.LocationName, portal);
+            // if a warp was created, add it
+            Warp warp = PortalGuns[portalPosition.PlayerIndex].GetWarp(portalPosition.Index);
+            if (warp == null)
+                return false;
+
+            // add it to the game location
+            Game1.getLocationFromName(portalPosition.LocationName).warps.Add(warp);
+            return true;
         }
 
-        private void Warped(object sender, WarpedEventArgs e)
+        private bool RemoveWarp(PortalPosition portalPosition)
         {
-            UpdateLocationsPortals(e.NewLocation.Name);
-            if (Context.IsMainPlayer)
+            // Warps are global, so only have host handle them to avoid duplicates and ghosts
+            if (!Context.IsMainPlayer)
             {
-                if (!(e.NewLocation is MineShaft mine))
-                    return;
+                this.Helper.Multiplayer.SendMessage(portalPosition, "RemoveWarp", modIDs: new[] { this.ModManifest.UniqueID });
+                return false;
+            }
 
-                if (mine.mineLevel == Game1.player.deepestMineLevel)
-                    return;
+            GameLocation location = Game1.getLocationFromName(portalPosition.LocationName);
+            Layer layer = location.map.GetLayer("Buildings");
 
-                // deepestMineLevel has changed
-                LoadMinePortals();
+            // Remove portal tile
+            if (layer.Tiles[portalPosition.X, portalPosition.Y] != null)
+                location.removeTile(portalPosition.X, portalPosition.Y, "Buildings");
+
+            return true;
+        }
+
+
+        private bool AddPortalSprite(PortalPosition portalPosition)
+        {
+            RemovedPortalSprites.RemoveItem(portalPosition);
+            if (portalPosition.LocationName != Game1.currentLocation.Name)
+            {
+                AddedPortalSprites.AddItem(portalPosition.LocationName, portalPosition);
+                return false;
             }
             else
             {
-                LoadTileSheet(e.NewLocation);
+                // Add the sprite to the map
+                Layer layer = Game1.getLocationFromName(portalPosition.LocationName).map.GetLayer("Buildings");
+                TileSheet tileSheet = Game1.getLocationFromName(portalPosition.LocationName).map.GetTileSheet("z_portal-spritesheet");
+
+                layer.Tiles[portalPosition.X, portalPosition.Y] = new StaticTile(
+                    layer, tileSheet, BlendMode.Additive, tileIndex: 4 + portalPosition.Index * 5); 
             }
+            AddedPortalSprites.RemoveItem(portalPosition);
+            return true;
         }
 
-        private void LoadTileSheet(GameLocation location)
+        private bool AddPortalSprites(List<PortalPosition> portalPositions)
         {
-            // Add the tilesheet.
-            TileSheet tileSheet = new TileSheet(
-               id: "z_portal-spritesheet", // a unique ID for the tilesheet
-               map: location.map,
-               imageSource: TileSheetPath,
-               sheetSize: new xTile.Dimensions.Size(800, 16), // the pixel size of your tilesheet image.
-               tileSize: new xTile.Dimensions.Size(16, 16) // should always be 16x16 for maps
-            );
-
-            if (location != null && location.map != null && tileSheet != null)
+            bool allRemoved = true;
+            foreach (PortalPosition portalPosition in portalPositions.ToList())
             {
-                //this.Monitor.Log("adding and loading tilesheet for location: " + location.Name, LogLevel.Debug);
-                location.map.AddTileSheet(tileSheet);// Multiplayer load error here
-                location.map.LoadTileSheets(Game1.mapDisplayDevice);
+                if (!AddPortalSprite(portalPosition))
+                    allRemoved = false;
             }
+            return allRemoved;
         }
 
-        private void UpdateLocationsPortals(string newLocation)
+        public bool RemovePortalSprite(PortalPosition portalPosition)
         {
-            List<PortalPosition> PortalsToAdd = PortalQueue.GetItemList(newLocation);
+            // if it has already been added previously (same indices, location, and coords) remove from queue
+            AddedPortalSprites.RemoveItem(portalPosition);
 
-            // Handle outdated portals 
-            DequeuePortalTable(PortalsToAdd);
-            // Handle outdated warps
-            RemoveQueuedWarps();
-            // 
-            AddPortals(PortalsToAdd);
+            if (portalPosition.LocationName != Game1.currentLocation.Name)
+            {
+                RemovedPortalSprites.AddItem(portalPosition.LocationName, portalPosition);
+                return false;
+            }
+            else // TODO if the OldTiles need to be saved, this needs to be edited
+            {
+                Game1.getLocationFromName(portalPosition.LocationName).removeTile(portalPosition.X, portalPosition.Y, "Buildings");
+                RemovedPortalSprites.RemoveItem(portalPosition);
+            }
+            return true;
         }
 
-        
-        private void DequeuePortalTable(List<PortalPosition> PortalsToAdd)
+        private bool RemovePortalSprites(List<PortalPosition> portalPositions)
         {
-            // remove existing portals's warps and table references
-            if (PortalsToAdd == null)
-                return;
+            bool allRemoved = true;
+            foreach (PortalPosition portalPosition in portalPositions.ToList())
+            {
+                if (!RemovePortalSprite(portalPosition))
+                    allRemoved = false;
+            }
+            return allRemoved;
+        }
 
-            foreach (PortalPosition portal in PortalsToAdd) // host failure here Object reference not set to an instance of an object
-                RemovePortals(portal.PlayerIndex);
+
+        /******************************************************************************
+         * Portal Removal
+         *****************************************************************************/
+        private void RetractPortals(int portalGunIndex)
+        {
+            for (int i = 0; i < MAX_PORTALS; i++)
+            {
+                // Handle Warps
+                RemoveWarp(PortalGuns[portalGunIndex].GetPortal(i).PortalPos);
+                // Handle Table
+                RemovePortals(portalGunIndex);
+            }
+
+            PortalGuns[portalGunIndex].RemovePortals();
+
+
+            // Bells and Whistles
+            Game1.switchToolAnimation();
+            Game1.currentLocation.playSoundAt("serpentDie", Game1.player.getTileLocation());
+
+            // Notify players
+            int playerId = PlayerIndex;
+            this.Helper.Multiplayer.SendMessage(playerId, "RetractPortals", modIDs: new[] { this.ModManifest.UniqueID });
         }
 
         private bool RemovePortals(int gunIndex)
@@ -305,7 +321,7 @@ namespace MultiplayerPortalGuns
 
             // if existing portal exists in current map
             string locationName = PortalTable.GetLocationName(portal.PortalPos.Id);
-            if (Context.IsMainPlayer || Game1.currentLocation.Name == locationName)
+            if (Game1.currentLocation.Name == locationName)
             {
                 // remove warp
                 //Game1.currentLocation.warps.Remove(portal.Warp);
@@ -321,124 +337,99 @@ namespace MultiplayerPortalGuns
                 // Place the old tile
                 layer.Tiles[portal.PortalPos.X, portal.PortalPos.Y] = portal.OldTile;
             }
-            else // portal exists in map, but not current location
-                RemovalQueue.AddItem(portal.PortalPos.LocationName, portal.Warp);
+            else // portal exists in map, but not current location 
+            {
+                if (portal.PortalPos.LocationName != "" && portal.Warp != null)
+                    WarpRemovalQueue.AddItem(portal.PortalPos.LocationName, portal.Warp);
+            }
 
             PortalTable.RemoveItem(portal.PortalPos);
 
             return true;
         }
-        /// <summary>
-        /// Handles immediate / queuing removal of a warp
-        /// </summary>
-        /// <param name="portal">uses the portal's locationName and Warp</param>
-        /// <returns></returns>
-        private bool RemoveWarp(Portal portal)
+        private bool RemoveWarps(List<PortalPosition> portalPositions)
         {
-            return RemoveWarp(portal.PortalPos.LocationName, portal.Warp);
-        }
-        /// <summary>
-        /// Handles immediate / queuing removal of a warp
-        /// </summary>
-        /// <param name="locationName">The location the warp is in</param>
-        /// <param name="warp">The warp to be removed</param>
-        /// <returns></returns>
-        private bool RemoveWarp(string locationName, Warp warp)
-        {
-            if (locationName == null || locationName == "")
+            if (portalPositions == null)
                 return false;
-            // remove immediately
-            if (locationName == Game1.currentLocation.Name)
+            bool allRemoved = true;
+            foreach (PortalPosition portalPosition in portalPositions.ToList())
             {
-                Game1.currentLocation.warps.Remove(warp);
-                WarpRemovalQueue.RemoveItem(warp);
+                if (!RemoveWarp(portalPosition))
+                    allRemoved = false;
             }
-            // remove later
-            else
-            {
-                // add to warpRemovalQueue if not already in
-                WarpRemovalQueue.AddItem(locationName, warp);
-            }
-            return true;
+            return allRemoved;
         }
 
-        private void RemoveQueuedWarps()
+        /******************************************************************************
+         * Player enters a new location
+         *****************************************************************************/
+        private void Warped(object sender, WarpedEventArgs e)
         {
-            string currentLocation = Game1.currentLocation.Name;
-            if (!WarpRemovalQueue.LocationToItemList.TryGetValue(
-                currentLocation, out List<Warp> OldWarps))
-                return;
-
-            // Remove every warp queued for removal in the currentLocation
-            foreach (Warp warp in OldWarps)
-                RemoveWarp(currentLocation, warp);
-
-        }
-
-        private void AddPortals(List<PortalPosition> PortalsToAdd)
-        {
-            if (PortalsToAdd == null)
-                return;
-            foreach (PortalPosition portal in PortalsToAdd)
-                AddPortal(portal);
-        }
-
-        private bool AddPortal(PortalPosition portalPosition)
-        {
-            if (portalPosition.LocationName != Game1.currentLocation.Name)
+            string locationName = e.NewLocation.Name;
+            /*if (Context.IsMainPlayer)
             {
-                // portal should be queued instead
-                return false;
+                if (!(e.NewLocation is MineShaft mine))
+                    return;
+
+                if (mine.mineLevel == Game1.player.deepestMineLevel)
+                    return;
+
+                // deepestMineLevel has changed
+                LoadMinePortals();
             }
-            // get the old target's warp incase it is removed
-            Portal targetPortal = GetTargetPortal(portalPosition);
-            Warp oldTargetWarp = targetPortal.Warp;
+            else*/
+            //{
+                LoadTileSheet(e.NewLocation);
+            //}
 
-            // add into PortalGun object
-            PortalGuns[portalPosition.PlayerIndex].AddPortal(portalPosition);
-
-            // if the warp was made
-            Warp warp = PortalGuns[portalPosition.PlayerIndex].GetWarp(portalPosition.Index);
-            if (warp == null)
-                return false;
-
-            // add it to the game location
-            Game1.currentLocation.warps.Add(warp);
-
-            // remove the old warp (note the target portal's location won't change)
-            RemoveWarp(targetPortal.PortalPos.LocationName, oldTargetWarp);
-
-
-            // add the new target portal's warp
-            AddTargetPortal(targetPortal);
-
-            Game1.getLocationFromName(Game1.currentLocation.Name).removeTile(portalPosition.X, portalPosition.Y, "Buildings");
-
-            // ensure the portal is dequeued
-            PortalQueue.RemoveItem(portalPosition);
-            return true;
+            RemovePortalSprites(RemovedPortalSprites.GetItemsInLocation(locationName));
+            AddPortalSprites(AddedPortalSprites.GetItemsInLocation(locationName));
         }
 
-        private void AddTargetPortal(Portal targetPortal)
+        /******************************************************************************
+         * Multiplayer Routing
+         *****************************************************************************/
+        private void Multiplayer_ModMessageReceived(object sender, ModMessageReceivedEventArgs e)
         {
-            if (Game1.currentLocation.Name == targetPortal.PortalPos.LocationName)
+            /* // Message from Host to targeted Peer to give PortalTable to them
+             if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "SetPortalTable" + this.PlayerIndex)
+                 SetPortalTable(e.ReadAs<LocationUpdater<PortalPosition>>());*/
+
+            // Message from host to targeted Peer to assign PlayerIndex
+            if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "PlayerIndex" + Game1.player.UniqueMultiplayerID)
+                LoadPortalGuns(e.ReadAs<int>());
+
+
+            // Warps are global, so they are to be handled by the host only
+            else if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "AddWarp")
             {
-                // replace the target portal's warp
-                Game1.getLocationFromName(Game1.currentLocation.Name)
-                    .warps.Add(targetPortal.Warp);
+                if (Context.IsMainPlayer)
+                    AddWarp(e.ReadAs<PortalPosition>());
             }
-            else
+
+            else if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "RemoveWarp")
             {
-                // add it to the PortalQueue
-                PortalQueue.AddItem(targetPortal.PortalPos.LocationName,
-                    targetPortal.PortalPos);
+                if (Context.IsMainPlayer)
+                    RemoveWarp(e.ReadAs<PortalPosition>());
             }
+
+            // Portal Sprites are local so all players need to handle each other
+            else if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "AddPortalSprite")
+                AddPortalSprite(e.ReadAs<PortalPosition>());
+
+            else if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "RemovePortalSprite")
+                RemovePortalSprite(e.ReadAs<PortalPosition>());
+
+            // keeping the logic for all the portal guns the same
+            else if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "UpdatePortalGun")
+                UpdatePortalGun(e.ReadAs<PortalPosition>());
+            
+
         }
 
-        public Portal GetTargetPortal(PortalPosition portalPosition)
+        private void SetPortalTable(LocationUpdater<PortalPosition> PortalTable)
         {
-            return PortalGuns[portalPosition.PlayerIndex]
-                .GetTargetPortal(portalPosition.Index);
+            this.PortalTable = PortalTable;
         }
 
         private void Multiplayer_PeerContextReceived(object sender, PeerContextReceivedEventArgs e)
@@ -456,25 +447,90 @@ namespace MultiplayerPortalGuns
 
             LocationUpdater<PortalPosition> TableMessage = this.PortalTable;
 
-            this.Helper.Multiplayer.SendMessage(TableMessage, "CreateQueue" + PlayerList.IndexOf(e.Peer.PlayerID), 
+            this.Helper.Multiplayer.SendMessage(TableMessage, "SetPortalTable" + PlayerList.IndexOf(e.Peer.PlayerID), 
                 modIDs: new[] { this.ModManifest.UniqueID });
         }
 
+        /******************************************************************************
+         * Loading Textures, Portal Guns, and Locations
+         *****************************************************************************/
+        private void AfterLoad(object sender, SaveLoadedEventArgs e)
+        {
+            PortalTable = new LocationUpdater<PortalPosition>();
+            WarpRemovalQueue = new LocationUpdater<Warp>();
 
+            this.Monitor.Log("hitting after load, SaveLoadedEventArgs");
+
+            if (Context.IsMainPlayer)
+            {
+                PlayerIndex = 1;
+                PlayerList.Add(0);
+                LoadPortalGuns(1);
+
+                LoadPortalTextures();
+                LoadMinePortals();
+            }
+            else
+            {
+                LoadPortalGuns(1);
+                LoadPortalTextures();
+            }
+
+            // TODO LoadPortalSaves();
+        }
+        /* // Not sure why there's a duplicate function, investigate w/ mutliplayer
+        private void AfterLoad(object sender, EventArgs e)
+        {
+            this.Monitor.Log("hitting after load, eventArs");
+            if (Context.IsMainPlayer)
+            {
+                PlayerIndex = 1;
+                PlayerList.Add(0);
+                LoadPortalGuns(1);
+
+                LoadPortalTextures();
+                LoadMinePortals();
+            }
+
+            // TODO LoadPortalSaves();
+        } */
+
+
+        private void LoadTileSheet(GameLocation location)
+        {
+            // Add the tilesheet.
+            TileSheet tileSheet = new TileSheet(
+               id: "z_portal-spritesheet", // a unique ID for the tilesheet
+               map: location.map,
+               imageSource: TileSheetPath,
+               sheetSize: new xTile.Dimensions.Size(800, 16), // the pixel size of your tilesheet image.
+               tileSize: new xTile.Dimensions.Size(16, 16) // should always be 16x16 for maps
+            );
+
+            if (location != null && location.map != null && tileSheet != null)
+            {
+                //this.Monitor.Log("adding and loading tilesheet for location: " + location.Name, LogLevel.Debug);
+                location.map.AddTileSheet(tileSheet);// Multiplayer load error here
+                location.map.LoadTileSheets(Game1.mapDisplayDevice);
+            }
+        }
 
         private void LoadPortalGuns(int playerNumber)
         {
             for (int i = 0; i < MAX_PORTAL_GUNS; i++)
             {
                 string portalGunId = "PortalGun" + i + "Id";
-                Texture2D portalGunTexture = this.Helper.Content.Load<Texture2D>($"Assets{Path.DirectorySeparatorChar}PortalGun" + (i+1) + ".png");
-                PortalGunObjects[i] = CustomObjectData.newObject(portalGunId, portalGunTexture, Color.White, "Portal Gun",
-                    "Property of Aperture Science Inc.", 0, "", "Basic", 1, -300, "", craftingData: new CraftingData("Portal Gun", "388 1"));
+                Texture2D portalGunTexture = this.Helper.Content.Load<Texture2D>(
+                    $"Assets{Path.DirectorySeparatorChar}PortalGun" + (i+1) + ".png");
+
+                PortalGunObjects[i] = CustomObjectData.newObject(portalGunId, portalGunTexture,
+                    Color.White, "Portal Gun", "Property of Aperture Science Inc.", 0, "", "Basic", 1, -300, "", 
+                    craftingData: new CraftingData("Portal Gun", "388 1"));
+
                 if (i == playerNumber)
                     PortalGunObjects[i].craftingData = new CraftingData("Portal Gun", "388 1");
 
                 PortalGuns[i] = new PortalGun(portalGunId, i, MAX_PORTALS);
-
             }
         }
 
