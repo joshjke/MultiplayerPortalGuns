@@ -35,10 +35,16 @@ namespace MultiplayerPortalGuns
         PortalGun[] PortalGuns = new PortalGun[MAX_PORTAL_GUNS];
         CustomObjectData[] PortalGunObjects = new CustomObjectData[MAX_PORTAL_GUNS];
 
-        LocationUpdater<PortalPosition> AddedPortalSprites = new LocationUpdater<PortalPosition>();
-        LocationUpdater<PortalPosition> RemovedPortalSprites = new LocationUpdater<PortalPosition>();
+        // Used for late updating the map's tile sprites in multiplayer when a portal is made
+        LocationUpdater<PortalPosition> AddedPortalSprites;
+        LocationUpdater<PortalPosition> RemovedPortalSprites;
+
+        // Used for updating the portal tables of farmhands when they join
+        LocationUpdater<PortalPosition> ActivePortalSprites;
 
 
+        // Filepaths
+        private string LocationSaveFileName;
         private string TileSheetPath;
 
 
@@ -54,6 +60,7 @@ namespace MultiplayerPortalGuns
             helper.Events.GameLoop.SaveLoaded += this.AfterLoad;
             helper.Events.Player.Warped += this.Warped;
             helper.Events.Multiplayer.ModMessageReceived += Multiplayer_ModMessageReceived;
+            helper.Events.Multiplayer.PeerContextReceived += Multiplayer_PeerContextReceived;
             helper.Events.Input.ButtonPressed += Input_ButtonPressed;
 
         }
@@ -70,6 +77,9 @@ namespace MultiplayerPortalGuns
             // Retract portals of current portal gun
             else if (e.Button.ToString().ToLower() == this.config.RetractPortals.ToLower())
                 RetractPortals(PlayerIndex);
+
+            else if (e.Button.ToString().ToLower() == "p" && Context.IsMainPlayer)
+                Helper.Data.WriteJsonFile(LocationSaveFileName, ActivePortalSprites.GetAllItems());
 
         }
 
@@ -109,16 +119,10 @@ namespace MultiplayerPortalGuns
             RemoveWarpAndSprite(PortalGuns[PlayerIndex].GetPortal(index).PortalPos);
             AddPortal(portalPos);
 
-            // Message other players to add the portal
-            this.Helper.Multiplayer.SendMessage(portalPos, "AddPortal",
-               modIDs: new[] { this.ModManifest.UniqueID });
-
             // Tile animation and stuff
 
             // TODO animate the portal spawning
             //PortalAnimationFrame[i] + i * 5
-
-            this.Helper.Multiplayer.SendMessage(portalPos, "AddPortal", modIDs: new[] { this.ModManifest.UniqueID });
 
             // Bells and whistles
             Game1.currentLocation.playSoundAt("debuffSpell", Game1.player.getTileLocation());
@@ -160,6 +164,12 @@ namespace MultiplayerPortalGuns
             return true;
         }
 
+        private void AddWarpsAndSprites(List<PortalPosition> portalPositions)
+        {
+            foreach (PortalPosition portalPosition in portalPositions)
+                AddWarpAndSprite(portalPosition);
+        }
+
         private void AddWarpAndSprite(PortalPosition portalPosition)
         {
             AddWarp(portalPosition);
@@ -178,6 +188,17 @@ namespace MultiplayerPortalGuns
         {
             return PortalGuns[portalPosition.PlayerIndex]
                 .GetTargetPortal(portalPosition.Index);
+        }
+
+        private bool ReloadPortals(List<PortalPosition> portalPositions)
+        {
+            foreach (PortalPosition portalPosition in portalPositions)
+            {
+                if (portalPosition != null)
+                    UpdatePortalGun(portalPosition);
+            }
+            AddWarpsAndSprites(portalPositions);
+            return true;
         }
 
         private bool UpdatePortalGun(PortalPosition portalPosition)
@@ -199,7 +220,7 @@ namespace MultiplayerPortalGuns
                 return false;
 
             // add it to the game location
-            portalPosition.location.warps.Add(warp);
+            Game1.getLocationFromName(portalPosition.LocationName).warps.Add(warp);
             return true;
         }
 
@@ -211,13 +232,15 @@ namespace MultiplayerPortalGuns
                 this.Helper.Multiplayer.SendMessage(portalPosition, "RemoveWarp", modIDs: new[] { this.ModManifest.UniqueID });
                 return false;
             }
-            if (portalPosition.location == null)
+            string locationName = portalPosition.LocationName;
+            if (locationName == "" || locationName == null)
                 return false;
+            GameLocation location = Game1.getLocationFromName(portalPosition.LocationName);
 
             // remove the warp from the location
             Warp warp = GetWarp(portalPosition);
             if (warp != null)
-                portalPosition.location.warps.Remove(GetWarp(portalPosition));
+                location.warps.Remove(GetWarp(portalPosition));
 
             return true;
         }
@@ -244,16 +267,21 @@ namespace MultiplayerPortalGuns
         private bool AddPortalSprite(PortalPosition portalPosition)
         {
             AddedPortalSprites.RemoveItem(portalPosition);
-            if (portalPosition.location != Game1.currentLocation)
             {
-                AddedPortalSprites.AddItem(portalPosition.location, portalPosition);
+                ActivePortalSprites.RemoveItem(portalPosition);
+                ActivePortalSprites.AddItem(portalPosition.LocationName, portalPosition);
+            }
+
+            if (portalPosition.LocationName != Game1.currentLocation.NameOrUniqueName)
+            {
+                AddedPortalSprites.AddItem(portalPosition.LocationName, portalPosition);
                 return false;
             }
             else
             {
                 // Add the sprite to the map
-                Layer layer = portalPosition.location.map.GetLayer("Buildings");
-                TileSheet tileSheet = portalPosition.location.map.GetTileSheet("z_portal-spritesheet");
+                Layer layer = Game1.getLocationFromName(portalPosition.LocationName).map.GetLayer("Buildings");
+                TileSheet tileSheet = Game1.getLocationFromName(portalPosition.LocationName).map.GetTileSheet("z_portal-spritesheet");
 
                 layer.Tiles[portalPosition.X, portalPosition.Y] = new StaticTile(
                     layer, tileSheet, BlendMode.Additive, tileIndex: 4 + portalPosition.Index * 5); 
@@ -277,35 +305,38 @@ namespace MultiplayerPortalGuns
 
         public bool RemovePortalSprite(PortalPosition portalPosition)
         {
-            return RemovePortalSprite(portalPosition.location, portalPosition);
+            return RemovePortalSprite(portalPosition.LocationName, portalPosition);
         }
 
-        public bool RemovePortalSprite(GameLocation location, PortalPosition portalPosition)
+        public bool RemovePortalSprite(string locationName, PortalPosition portalPosition)
         {
             // if it has already been added previously (same indices, location, and coords) remove from queue
             AddedPortalSprites.RemoveItem(portalPosition);
 
-            if (location != Game1.currentLocation)
+            if (Context.IsMainPlayer)
+                ActivePortalSprites.RemoveItem(portalPosition);
+
+            if (locationName != Game1.currentLocation.NameOrUniqueName)
             {
-                RemovedPortalSprites.AddItem(location, portalPosition);
+                RemovedPortalSprites.AddItem(locationName, new PortalPosition(portalPosition));
                 return false;
             }
             else // TODO if the OldTiles need to be saved, this needs to be edited
             {
-                location.removeTile(portalPosition.X, portalPosition.Y, "Buildings");
+                Game1.getLocationFromName(locationName).removeTile(portalPosition.X, portalPosition.Y, "Buildings");
                 RemovedPortalSprites.RemoveItem(portalPosition);
             }
             return true;
         }
 
-        private bool RemovePortalSprites(GameLocation location, List<PortalPosition> portalPositions)
+        private bool RemovePortalSprites(string locationName, List<PortalPosition> portalPositions)
         {
             if (portalPositions == null)
                 return false;
             bool allRemoved = true;
             foreach (PortalPosition portalPosition in portalPositions.ToList())
             {
-                if (!RemovePortalSprite(location, portalPosition))
+                if (!RemovePortalSprite(locationName, portalPosition))
                     allRemoved = false;
             }
             return allRemoved;
@@ -356,7 +387,7 @@ namespace MultiplayerPortalGuns
          *****************************************************************************/
         private void Warped(object sender, WarpedEventArgs e)
         {
-            GameLocation location = e.NewLocation;
+            string locationName = e.NewLocation.Name;
             /*if (Context.IsMainPlayer)
             {
                 if (!(e.NewLocation is MineShaft mine))
@@ -373,8 +404,10 @@ namespace MultiplayerPortalGuns
                 LoadTileSheet(e.NewLocation);
             //}
 
-            RemovePortalSprites(location, RemovedPortalSprites.GetItemsInLocation(location));
-            AddPortalSprites(AddedPortalSprites.GetItemsInLocation(location));
+            RemovePortalSprites(locationName, RemovedPortalSprites.GetItemsInLocation(locationName));
+            AddPortalSprites(AddedPortalSprites.GetItemsInLocation(locationName));
+
+            if ()
         }
 
         /******************************************************************************
@@ -385,9 +418,9 @@ namespace MultiplayerPortalGuns
             /* // Message from Host to targeted Peer to give PortalTable to them
              if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "SetPortalTable" + this.PlayerIndex)
                  SetPortalTable(e.ReadAs<LocationUpdater<PortalPosition>>());*/
-
+            long holdthisThanks = Game1.player.UniqueMultiplayerID;
             // Message from host to targeted Peer to assign PlayerIndex
-            if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "PlayerIndex" + Game1.player.UniqueMultiplayerID)
+            if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "PlayerIndex")
                 LoadPortalGuns(e.ReadAs<int>());
 
 
@@ -414,10 +447,37 @@ namespace MultiplayerPortalGuns
             // keeping the logic for all the portal guns the same
             else if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "UpdatePortalGun")
                 UpdatePortalGun(e.ReadAs<PortalPosition>());
-            
+
+            else if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "GetActivePortalSprites")
+                SendActivePortalSprites(e.FromPlayerID);
+
+            else if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "SendActivePortalSprites")
+                SetActivePortalSprites(e.ReadAs<List<PortalPosition>>());
 
         }
 
+        private void SendActivePortalSprites(long playerId)
+        {
+            if (!Context.IsMainPlayer)
+                return;
+            this.Helper.Multiplayer.SendMessage(this.ActivePortalSprites.GetAllItems(),
+                "SendActivePortalSprites",
+                modIDs: new[] { this.ModManifest.UniqueID }, new long[] { playerId });
+        }
+
+        private void SetActivePortalSprites(List<PortalPosition> portalSpritesToAdd)
+        {
+            AddedPortalSprites = new LocationUpdater<PortalPosition>();
+
+            RemovedPortalSprites = new LocationUpdater<PortalPosition>();
+
+            //LoadPortalTextures();
+
+            foreach (PortalPosition portalPosition in portalSpritesToAdd)
+                AddPortalSprite(new PortalPosition(portalPosition));
+        }
+
+        
         private void Multiplayer_PeerContextReceived(object sender, PeerContextReceivedEventArgs e)
         {
             if (!Context.IsMainPlayer)
@@ -427,15 +487,10 @@ namespace MultiplayerPortalGuns
             {
                 PlayerList.Add(e.Peer.PlayerID);
                 int PlayerIndex = PlayerList.Count;
-                this.Helper.Multiplayer.SendMessage(PlayerIndex, "PlayerIndex" + e.Peer.PlayerID, modIDs: new[] { this.ModManifest.UniqueID });
-                //this.Monitor.Log("SENT retract portal json", LogLevel.Debug);
+                this.Helper.Multiplayer.SendMessage(PlayerIndex, "PlayerIndex", modIDs: new[] { this.ModManifest.UniqueID }, new long[] { e.Peer.PlayerID });
             }
 
-            // TODO: keep a table of active portal sprites for late joining players
-            LocationUpdater<PortalPosition> TableMessage = this.AddedPortalSprites;
-
-            this.Helper.Multiplayer.SendMessage(TableMessage, "SetAddedPortalSprites" + PlayerList.IndexOf(e.Peer.PlayerID), 
-                modIDs: new[] { this.ModManifest.UniqueID });
+            
         }
 
         /******************************************************************************
@@ -443,8 +498,10 @@ namespace MultiplayerPortalGuns
          *****************************************************************************/
         private void AfterLoad(object sender, SaveLoadedEventArgs e)
         {
-            AddedPortalSprites = new LocationUpdater<PortalPosition>();
-            RemovedPortalSprites = new LocationUpdater<PortalPosition>();
+                AddedPortalSprites = new LocationUpdater<PortalPosition>();
+                RemovedPortalSprites = new LocationUpdater<PortalPosition>();
+
+                ActivePortalSprites = new LocationUpdater<PortalPosition>();
 
             this.Monitor.Log("hitting after load, SaveLoadedEventArgs");
 
@@ -456,11 +513,16 @@ namespace MultiplayerPortalGuns
 
                 LoadPortalTextures();
                 LoadMinePortals();
+
+                LoadPortalSaves();
             }
             else
             {
                 LoadPortalGuns(1);
                 LoadPortalTextures();
+
+               this.Helper.Multiplayer.SendMessage(Game1.player.UniqueMultiplayerID, "GetActivePortalSprites",
+               modIDs: new[] { this.ModManifest.UniqueID });
             }
 
             // TODO LoadPortalSaves();
@@ -482,6 +544,41 @@ namespace MultiplayerPortalGuns
             // TODO LoadPortalSaves();
         } */
 
+        private void LoadPortalGuns(int playerNumber)
+        {
+            for (int i = 0; i < MAX_PORTAL_GUNS; i++)
+            {
+                string portalGunId = "PortalGun" + i + "Id";
+                Texture2D portalGunTexture = this.Helper.Content.Load<Texture2D>(
+                    $"Assets{Path.DirectorySeparatorChar}PortalGun" + (i + 1) + ".png");
+
+                PortalGunObjects[i] = CustomObjectData.newObject(portalGunId, portalGunTexture,
+                    Color.White, "Portal Gun", "Property of Aperture Science Inc.", 0, "", "Basic", 1, -300, "",
+                    craftingData: new CraftingData("Portal Gun", "388 1"));
+
+                if (i == playerNumber)
+                    PortalGunObjects[i].craftingData = new CraftingData("Portal Gun", "388 1");
+
+                PortalGuns[i] = new PortalGun(portalGunId, i, MAX_PORTALS);
+            }
+        }
+
+        private void LoadPortalSaves()
+        {
+            // Reads or Creates a Portal Gun save data file
+            LocationSaveFileName =
+                $"Data{Path.DirectorySeparatorChar}{Constants.SaveFolderName}.json";
+            // path/Data/SaveFolderName.json
+                
+            List<PortalPosition> portalPositions = Helper.Data.ReadJsonFile<List<PortalPosition>>(LocationSaveFileName);
+
+            if (portalPositions == null)
+                Helper.Data.WriteJsonFile(LocationSaveFileName, ActivePortalSprites.GetAllItems());
+            else
+                ReloadPortals(portalPositions);
+
+        }
+
 
         private void LoadTileSheet(GameLocation location)
         {
@@ -502,24 +599,7 @@ namespace MultiplayerPortalGuns
             }
         }
 
-        private void LoadPortalGuns(int playerNumber)
-        {
-            for (int i = 0; i < MAX_PORTAL_GUNS; i++)
-            {
-                string portalGunId = "PortalGun" + i + "Id";
-                Texture2D portalGunTexture = this.Helper.Content.Load<Texture2D>(
-                    $"Assets{Path.DirectorySeparatorChar}PortalGun" + (i+1) + ".png");
-
-                PortalGunObjects[i] = CustomObjectData.newObject(portalGunId, portalGunTexture,
-                    Color.White, "Portal Gun", "Property of Aperture Science Inc.", 0, "", "Basic", 1, -300, "", 
-                    craftingData: new CraftingData("Portal Gun", "388 1"));
-
-                if (i == playerNumber)
-                    PortalGunObjects[i].craftingData = new CraftingData("Portal Gun", "388 1");
-
-                PortalGuns[i] = new PortalGun(portalGunId, i, MAX_PORTALS);
-            }
-        }
+        
 
         private void LoadPortalTextures()
         {

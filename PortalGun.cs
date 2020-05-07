@@ -35,7 +35,7 @@ namespace MultiplayerPortalGuns
             RemoveWarps();
             for (int i = 0; i < MaxPortals; i++)
             {
-                portals[i].PortalPos.location = null;
+                portals[i].PortalPos.LocationName = null;
             }
         }
 
@@ -79,7 +79,7 @@ namespace MultiplayerPortalGuns
         {
             
             PortalPosition portal = new PortalPosition(index, this.Name, this.PlayerIndex, 
-                (int)Game1.currentCursorTile.X, (int)Game1.currentCursorTile.Y, Game1.currentLocation);
+                (int)Game1.currentCursorTile.X, (int)Game1.currentCursorTile.Y, Game1.currentLocation.NameOrUniqueName);
             if (ValidPortalPos(portal))
             {
                 //portals[index].PortalPos = portal;
@@ -93,8 +93,8 @@ namespace MultiplayerPortalGuns
 
         private bool ValidPortalPos(PortalPosition portalPos)
         {
-            return portalPos.location.isTileLocationTotallyClearAndPlaceable(portalPos.X, portalPos.Y)
-                && portalPos.location.isTileLocationTotallyClearAndPlaceable(portalPos.X + 1, portalPos.Y);
+            return Game1.getLocationFromName(portalPos.LocationName).isTileLocationTotallyClearAndPlaceable(portalPos.X, portalPos.Y)
+                && Game1.getLocationFromName(portalPos.LocationName).isTileLocationTotallyClearAndPlaceable(portalPos.X + 1, portalPos.Y);
         }
 
         // returns number of created warps
@@ -111,17 +111,19 @@ namespace MultiplayerPortalGuns
 
         bool CreateWarp(int index)
         {
-            if (portals[index].PortalPos.location == null)
+            if (portals[index].PortalPos.LocationName == ""
+                || portals[index].PortalPos.LocationName == null)
                 return false;
 
             int target = GetTargetIndex(index);
-            if (portals[target].PortalPos.location == null)
+            if (portals[target].PortalPos.LocationName == ""
+                || portals[target].PortalPos.LocationName == null)
                 return false;
 
             portals[index].Warp = new Warp(
                 portals[index].PortalPos.X, 
                 portals[index].PortalPos.Y, 
-                portals[target].PortalPos.location.Name,
+                portals[target].PortalPos.LocationName,
                 portals[target].PortalPos.X + 1, 
                 portals[target].PortalPos.Y,
                 false

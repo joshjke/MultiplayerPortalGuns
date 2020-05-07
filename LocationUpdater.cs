@@ -1,8 +1,9 @@
 ﻿
-using StardewValley;
+using Newtonsoft.Json;
 using System.Collections;
 using System.Collections.Generic;
-
+using System.Linq;
+using xTile.Dimensions;
 
 namespace MultiplayerPortalGuns
 {
@@ -26,16 +27,37 @@ namespace MultiplayerPortalGuns
     /// <typeparam name="T">Data type for containing map edits, referred to as Item</typeparam>
     internal class LocationUpdater<T>
     {
-        public Dictionary<GameLocation, List<T>> LocationToItemList { get; set; }
-        public Dictionary<int, GameLocation> ItemToLocation { get; set; }
+        public Dictionary<string, List<T>> LocationToItemList { get; set; }
+        public Dictionary<int, string> ItemToLocation { get; set; }
 
         internal LocationUpdater()
         {
-            LocationToItemList = new Dictionary<GameLocation, List<T>>();
-            ItemToLocation = new Dictionary<int, GameLocation>();
+            LocationToItemList = new Dictionary<string, List<T>>();
+            ItemToLocation = new Dictionary<int, string>();
+        }
+        [JsonConstructor]
+        public LocationUpdater(Dictionary<string, List<T>> locationsWithItems)
+        {
+            LocationToItemList = new Dictionary<string, List<T>>();
+            ItemToLocation = new Dictionary<int, string>();
+
+            List<string> locations = locationsWithItems.Keys.ToList();
+            // all the locations
+            foreach (string location in locations)
+            {
+                // the items in the location
+                foreach (T item in locationsWithItems[location].ToList())
+                    AddItem(location, item);
+            }
         }
 
-        public bool AddItem(GameLocation location, T item)
+        public LocationUpdater(Dictionary<string, List<T>> locationToItemLost,
+            Dictionary<int, string> ItemToLocaion)
+        {
+            this.LocationToItemList = locationToItemLost;
+            this.ItemToLocation = ItemToLocaion;
+        }
+        public bool AddItem(string locationName, T item)
         {
             if (item == null)
                 return false;
@@ -43,18 +65,18 @@ namespace MultiplayerPortalGuns
             RemoveItem(item);
 
             // if location does not have a mapping with an item list
-            if (location == null)
+            if (locationName == null || locationName == "")
                 return false;
-            if (!LocationToItemList.ContainsKey(location))
+            if (!LocationToItemList.ContainsKey(locationName))
             {
                 // add location to dictionary and give it a new item list
-                LocationToItemList.Add(location, new List<T>());
+                LocationToItemList.Add(locationName, new List<T>());
             }
             // add the item to the mapping
-            ItemToLocation.Add(item.GetHashCode(), location);
+            ItemToLocation.Add(item.GetHashCode(), locationName);
 
             // add the item to the Location's item list
-            LocationToItemList[location].Add(item);
+            LocationToItemList[locationName].Add(item);
 
             return true;
         }
@@ -67,9 +89,9 @@ namespace MultiplayerPortalGuns
         /// <returns></returns>
         public T GetItemFromId(T item)
         {
-            if (ItemToLocation.TryGetValue(item.GetHashCode(), out GameLocation location))
+            if (ItemToLocation.TryGetValue(item.GetHashCode(), out string locationName))
             {
-                return LocationToItemList[location][LocationToItemList[location].IndexOf(item)];
+                return LocationToItemList[locationName][LocationToItemList[locationName].IndexOf(item)];
             }
             else
                 return default;
@@ -81,13 +103,22 @@ namespace MultiplayerPortalGuns
         /// </summary>
         /// <param name="locationName">SDV name of the map location</param>
         /// <returns></returns>
-        public List<T> GetItemsInLocation(GameLocation location)
+        public List<T> GetItemsInLocation(string locationName)
         {
             List<T> itemList;
-            if (LocationToItemList.TryGetValue(location, out itemList))
+            if (LocationToItemList.TryGetValue(locationName, out itemList))
                 return itemList;
             else
                 return null;
+        }
+
+        public List<T> GetAllItems()
+        {
+            List<T> allItems = new List<T>();
+            List<List<T>> listOfLists = new List<List<T>>(LocationToItemList.Values.ToList());
+            foreach (List<T> list in listOfLists)
+                allItems.AddRange(list);
+            return allItems;
         }
 
         /// <summary>
@@ -115,12 +146,12 @@ namespace MultiplayerPortalGuns
         /// </summary>
         /// <param name="id">The item to get the location from</param>
         /// <returns></returns>
-        public GameLocation GetLocationName(int id)
+        public string GetLocationName(int id)
         {
-            if (ItemToLocation.TryGetValue(id, out GameLocation location))
-                return location;
+            if (ItemToLocation.TryGetValue(id, out string locationName))
+                return locationName;
             else
-                return null;
+                return "";
         }
     }
 
