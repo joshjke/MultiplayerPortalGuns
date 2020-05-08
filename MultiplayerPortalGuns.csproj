@@ -68,7 +68,6 @@
     <Compile Include="Portal.cs" />
     <Compile Include="PortalPosition.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="SpritesAddedToMap.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
