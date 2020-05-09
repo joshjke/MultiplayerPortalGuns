@@ -12,8 +12,7 @@ namespace MultiplayerPortalGuns
         /// PortalPosition from Lists </summary>
         public int Id { get; set; }
 
-        public bool Modified { get; set; } = true;
-        public bool Placed { get; set; } = false;
+        public int AnimationFrame = 0;
         public int Index { get; set; }
         public int PlayerIndex { get; set; }
         /// <summary> X tile position </summary>
