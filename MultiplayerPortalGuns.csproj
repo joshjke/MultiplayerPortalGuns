@@ -48,6 +48,9 @@
     <Reference Include="PyTK, Version=1.12.40.0, Culture=neutral, processorArchitecture=x86">
       <HintPath>packages\Platonymous.PyTK.1.12.40\lib\net452\PyTK.dll</HintPath>
     </Reference>
+    <Reference Include="SimpleSoundManager">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Stardew Valley\Mods\SimpleSoundManager\SimpleSoundManager.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />

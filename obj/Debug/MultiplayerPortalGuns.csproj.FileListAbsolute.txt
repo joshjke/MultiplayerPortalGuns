@@ -25,3 +25,5 @@ E:\JoshJ\Documents (E)\repos\MultiplayerPortalGuns\obj\Debug\MultiplayerPortalGu
 E:\JoshJ\Documents (E)\repos\MultiplayerPortalGuns\obj\Debug\MultiplayerPortalGuns.dll
 E:\JoshJ\Documents (E)\repos\MultiplayerPortalGuns\obj\Debug\MultiplayerPortalGuns.pdb
 E:\JoshJ\Documents (E)\repos\MultiplayerPortalGuns\obj\Debug\MultiplayerPortalGuns.csprojAssemblyReference.cache
+E:\JoshJ\Documents (E)\repos\MultiplayerPortalGuns\bin\Debug\SimpleSoundManager.dll
+E:\JoshJ\Documents (E)\repos\MultiplayerPortalGuns\bin\Debug\SimpleSoundManager.pdb

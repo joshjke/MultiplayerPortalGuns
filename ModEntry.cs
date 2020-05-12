@@ -21,6 +21,10 @@ using xTile.Dimensions;
 using System;
 using Antlr.Runtime.Tree;
 
+using SimpleSoundManager;
+using SimpleSoundManager.Framework;
+using Microsoft.Xna.Framework.Audio;
+
 namespace MultiplayerPortalGuns
 {
     class ModEntry : Mod
@@ -53,6 +57,9 @@ namespace MultiplayerPortalGuns
         // Filepaths
         private string LocationSaveFileName;
         private string TileSheetPath;
+        private string SoundsPath;
+
+        SoundManager sound;
 
 
         public override void Entry(IModHelper helper)
@@ -64,6 +71,9 @@ namespace MultiplayerPortalGuns
 
             TileSheetPath = this.Helper.Content.GetActualAssetKey($"Assets{Path.DirectorySeparatorChar}PortalsAnimated3.png", ContentSource.ModFolder);
 
+            SoundsPath = $"{this.Helper.DirectoryPath}{Path.DirectorySeparatorChar}Assets{Path.DirectorySeparatorChar}Sounds";
+
+
             helper.Events.GameLoop.SaveLoaded += this.AfterLoad;
             helper.Events.Player.Warped += this.Warped;
             helper.Events.Multiplayer.ModMessageReceived += Multiplayer_ModMessageReceived;
@@ -72,11 +82,19 @@ namespace MultiplayerPortalGuns
             helper.Events.GameLoop.Saved += GameLoop_Saved;
             helper.Events.GameLoop.UpdateTicked += GameLoop_UpdateTicked;
 
+            sound = new SoundManager();
+            sound.loadWavFile(this.Helper, "retractPortals", SoundsPath);
+
+           
+            XACTSound aCTSound = new XACTSound(())
         }
 
         private void GameLoop_UpdateTicked(object sender, UpdateTickedEventArgs e)
         {
             AnimatePortals();
+
+            
+
         }
 
         private void Input_ButtonPressed(object sender, ButtonPressedEventArgs e)
@@ -442,7 +460,13 @@ namespace MultiplayerPortalGuns
 
             // Bells and Whistles
             Game1.switchToolAnimation();
-            Game1.currentLocation.playSoundAt("serpentDie", Game1.player.getTileLocation());
+            //Game1.currentLocation.playSoundAt("serpentDie", Game1.player.getTileLocation());
+            //sound.playSound("retractPortals");
+            if (sound.sounds.TryGetValue("retractPortals", out Sound retractSound))
+                retractSound.play();
+            
+            //sound.
+
 
         }
 

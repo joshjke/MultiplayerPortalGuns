@@ -4,10 +4,11 @@
   "Version": "1.1.0",
   "Description": "Adds a functional portal gun",
   "Dependencies": [
-    { "UniqueID": "Platonymous.Toolkit" }
+    { "UniqueID": "Platonymous.Toolkit" },
+    { "UniqueID": "Omegasis.SimpleSoundManager" }
   ],
   "UniqueID": "JoshJKe.PortalGun",
   "EntryDll": "MultiplayerPortalGuns.dll",
-  "MinimumApiVersion": "2.7",
+  "MinimumApiVersion": "2.10.0",
   "UpdateKeys": [ "Nexus:3049" ]
 }
