@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using PyTK.CustomElementHandler;
@@ -12,6 +9,10 @@ using StardewValley;
 
 namespace MultiplayerPortalGuns
 {
+    /// <summary>
+    /// PortalGunManager provides a set of functions for updating the logic of the
+    /// portal guns. It creates the PortalGun objects and retrieves data
+    /// </summary>
     class PortalGunManager
     {
         public const int MAX_PORTAL_GUNS = 4;
@@ -52,6 +53,11 @@ namespace MultiplayerPortalGuns
             return PortalGuns[playerIndex].GetPortalPosition(portalIndex);
         }
 
+        public void AddPortals(List<PortalPosition> portalSpritesToAdd)
+        {
+            foreach (PortalPosition portalPosition in portalSpritesToAdd)
+                AddPortal(portalPosition);
+        }
         public void AddPortal(PortalPosition portalPosition)
         {
             PortalGuns[portalPosition.PlayerIndex].AddPortal(portalPosition);
@@ -93,23 +99,10 @@ namespace MultiplayerPortalGuns
             foreach (PortalPosition portalPosition in portalPositions)
             {
                 if (portalPosition != null)
-                    UpdateAddPortal(portalPosition);
+                    AddPortal(portalPosition);
             }
-            return;
         }
 
-        public void UpdateAddPortal(PortalPosition portalPosition)
-        {
-            PortalGuns[portalPosition.PlayerIndex].AddPortal(portalPosition);
-        }
-
-        public void UpdateRemovePortals(int portalGunIndex)
-        {
-            PortalGuns[portalGunIndex].RemovePortals();
-        }
-
-
-        
 
     }
 }
