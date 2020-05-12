@@ -27,13 +27,12 @@ namespace MultiplayerPortalGuns
         // contains portal retract key
         private ModConfig config;
 
-        public const int MAX_PORTAL_GUNS = 4;
-        public const int MAX_PORTALS = 2;
+        //public const int MAX_PORTAL_GUNS = 4;
+        
         public const int MAX_PORTAL_SPRITES = 50;
         public const int PORTAL_ANIM_FRAMES = 5;
 
-        PortalGun[] PortalGuns = new PortalGun[MAX_PORTAL_GUNS];
-        CustomObjectData[] PortalGunObjects = new CustomObjectData[MAX_PORTAL_GUNS];
+        public PortalGunManager PortalGuns;
 
         // Assigned player index for mapping to a personal portal gun
         private int PlayerIndex;
@@ -112,23 +111,23 @@ namespace MultiplayerPortalGuns
                 || !Game1.player.CurrentItem.DisplayName.Contains("Portal Gun"))
                 return;
 
-            int index = 0;
+            int portalIndex = 0;
             if (e.Button.IsUseToolButton())
-                index = 0;
+                portalIndex = 0;
 
             else if (e.Button.IsActionButton())
-                index = 1;
+                portalIndex = 1;
 
             Game1.switchToolAnimation();
 
-            PortalPosition portalPos = PortalGuns[PlayerIndex].GetPortalPosition(index);
+            PortalPosition portalPos = PortalGuns.NewPortalPosition(PlayerIndex, portalIndex);
             if (portalPos == null)
             {
                 this.Monitor.Log("portalPosition is null", LogLevel.Debug);
                 return;
             }
 
-            RemoveWarpAndSprite(PortalGuns[PlayerIndex].GetPortal(index).PortalPos);
+            RemoveWarpAndSprite(PortalGuns.GetPortalPosition(PlayerIndex, portalIndex));
             portalPos.AnimationFrame = 0;
             AddPortal(portalPos);
 
@@ -143,21 +142,21 @@ namespace MultiplayerPortalGuns
         private void AddPortal(PortalPosition portalPosition)
         {
             // remove the target's warp
-            PortalPosition targetPortalPos = GetTargetPortal(portalPosition).PortalPos;
+            PortalPosition targetPortalPos = PortalGuns.GetTargetPortal(portalPosition).PortalPos;
             RemoveWarp(targetPortalPos);
 
             // assign the portal to the gun to handle the targeting warp structure
             //   but not any of the map placement
-            PortalGuns[portalPosition.PlayerIndex].AddPortal(portalPosition);
+            PortalGuns.AddPortal(portalPosition);
             this.Helper.Multiplayer.SendMessage(portalPosition, "UpdateAddPortal", modIDs: new[] { this.ModManifest.UniqueID });
 
             // add the new target portal's warp and sprites
             AddWarp(targetPortalPos);
 
             RemoveWarpAndSprite(portalPosition);
+
             // add the placed portal's warps and sprites
-            Portal portal = PortalGuns[portalPosition.PlayerIndex].GetPortal(portalPosition.Index);
-            AddWarpAndSprite(portal.PortalPos);
+            AddWarpAndSprite(portalPosition);
         }
 
         /******************************************************************************
@@ -171,7 +170,6 @@ namespace MultiplayerPortalGuns
         /// <summary>
         /// Adds warp, sprite, and messsages other players to add the sprite
         /// </summary>
-        /// <param name="portalPosition"></param>
         private void AddWarpAndSprite(PortalPosition portalPosition)
         {
             AddWarp(portalPosition);
@@ -181,7 +179,6 @@ namespace MultiplayerPortalGuns
         /// <summary>
         /// Removes warp, sprite, and messsages other players to remove the sprite
         /// </summary>
-        /// <param name="portalPosition"></param>
         private void RemoveWarpAndSprite(PortalPosition portalPosition)
         {
             RemoveWarp(portalPosition);
@@ -189,49 +186,14 @@ namespace MultiplayerPortalGuns
             this.Helper.Multiplayer.SendMessage(portalPosition, "RemovePortalSprite", modIDs: new[] { this.ModManifest.UniqueID });
         }
 
-        /******************************************************************************
-         * PortalGun Logic
-        *****************************************************************************/
-        /// <summary>
-        /// Returns the portal the targeted by the passed portalPosition
-        /// </summary>
-        /// <param name="portalPosition"></param>
-        /// <returns></returns>
-        public Portal GetTargetPortal(PortalPosition portalPosition)
-        {
-            return PortalGuns[portalPosition.PlayerIndex]
-                .GetTargetPortal(portalPosition.Index);
-        }
-
-        /// <summary>
-        /// Logically adds each portalPosition to their respective PortalGun
-        /// and updates the respective warps and sprites. Used when loading the game
-        /// </summary>
-        private void ReloadPortals(List<PortalPosition> portalPositions)
-        {
-            foreach (PortalPosition portalPosition in portalPositions)
-            {
-                if (portalPosition != null)
-                    UpdateAddPortal(portalPosition);
-            }
-            AddWarpsAndSprites(portalPositions);
-            return;
-        }
-
-        private bool UpdateAddPortal(PortalPosition portalPosition)
-        {
-            return PortalGuns[portalPosition.PlayerIndex].AddPortal(portalPosition);
-        }
-
-        private void UpdateRemovePortals(int portalGunIndex)
-        {
-            PortalGuns[portalGunIndex].RemovePortals();
-        }
+       
 
         /******************************************************************************
          * Warp logic
          *****************************************************************************/
-
+        /// <summary>
+        /// The main player adds the warp to the world
+        /// </summary>
         private bool AddWarp(PortalPosition portalPosition)
         {
             if (portalPosition.LocationName == "" || portalPosition.LocationName == null)
@@ -243,7 +205,7 @@ namespace MultiplayerPortalGuns
                 return true;
             }
             // if a warp was created, add it
-            Warp warp = GetWarp(portalPosition);
+            Warp warp = PortalGuns.GetWarp(portalPosition);
             if (warp == null)
                 return false;
 
@@ -268,16 +230,11 @@ namespace MultiplayerPortalGuns
             GameLocation location = Game1.getLocationFromName(portalPosition.LocationName);
 
             // remove the warp from the location
-            Warp warp = GetWarp(portalPosition);
+            Warp warp = PortalGuns.GetWarp(portalPosition);
             if (warp != null)
-                location.warps.Remove(GetWarp(portalPosition));
+                location.warps.Remove(PortalGuns.GetWarp(portalPosition));
 
             return true;
-        }
-
-        private Warp GetWarp(PortalPosition portalPosition)
-        {
-            return PortalGuns[portalPosition.PlayerIndex].GetWarp(portalPosition.Index);
         }
 
         /******************************************************************************
@@ -459,7 +416,7 @@ namespace MultiplayerPortalGuns
                 RemoveWarpAndSprite(PortalGuns[portalGunIndex].GetPortal(i).PortalPos);
             }*/
 
-            PortalGuns[portalGunIndex].RemovePortals();
+            PortalGuns.RemovePortals(portalGunIndex);
             // Notify players
             this.Helper.Multiplayer.SendMessage(portalGunIndex, "UpdateRemovePortals", modIDs: new[] { this.ModManifest.UniqueID });
 
@@ -473,12 +430,9 @@ namespace MultiplayerPortalGuns
         {
             //Portal[] portals = PortalGuns[gunIndex].GetPortals();
             //List<PortalPosition>() portalsToRemove()
-            foreach (Portal removablePortal in PortalGuns[gunIndex].GetPortals().ToList())
+            foreach (Portal removablePortal in PortalGuns.GetPortals(gunIndex))
             {
-                /*if (RemovePortal(removablePortal) == false)
-                    return false;*/
                 RemoveWarpAndSprite(removablePortal.PortalPos);
-                
             }
             return true;
         }
@@ -515,7 +469,7 @@ namespace MultiplayerPortalGuns
         {
             // Message from host to targeted Peer to assign PlayerIndex
             if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "PlayerIndex")
-                LoadPortalGuns(e.ReadAs<int>());
+                this.PlayerIndex = e.ReadAs<int>();
 
 
             // Warps are global, so they are to be handled by the host only
@@ -553,10 +507,10 @@ namespace MultiplayerPortalGuns
 
             // keeping the logic for all the portal guns the same
             else if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "UpdateAddPortal")
-                UpdateAddPortal(e.ReadAs<PortalPosition>());
+                PortalGuns.UpdateAddPortal(e.ReadAs<PortalPosition>());
 
             else if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "UpdateRemovePortals")
-                UpdateRemovePortals(e.ReadAs<int>());
+                PortalGuns.UpdateRemovePortals(e.ReadAs<int>());
 
             else if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "GetActivePortalSprites")
                 SendActivePortalSprites(e.FromPlayerID);
@@ -586,7 +540,7 @@ namespace MultiplayerPortalGuns
             foreach (PortalPosition portalPosition in portalSpritesToAdd)
             {
                 AddPortalSprite(new PortalPosition(portalPosition));
-                UpdateAddPortal(portalPosition);
+                PortalGuns.UpdateAddPortal(portalPosition);
             }
 
         }
@@ -615,42 +569,22 @@ namespace MultiplayerPortalGuns
 
             ActivePortalSprites = new LocationUpdater<PortalPosition>();
             AnimatedPortals = new LocationUpdater<PortalPosition>();
+            PortalGuns = new PortalGunManager(this.Helper.Content);
 
             this.Monitor.Log("hitting after load, SaveLoadedEventArgs");
+
+            LoadPortalTextures();
 
             if (Context.IsMainPlayer)
             {
                 PlayerIndex = 0;
-                //PlayerList.Add(Game1.player.uniqueMultiplayerID);
-                LoadPortalGuns(PlayerIndex);
-
-                LoadPortalTextures();
                 LoadMinePortals();
-
                 LoadSavedPortals();
             }
             else
             {
-               LoadPortalTextures();
                this.Helper.Multiplayer.SendMessage(Game1.player.UniqueMultiplayerID, "GetActivePortalSprites",
                modIDs: new[] { this.ModManifest.UniqueID });
-            }
-        }
-
-        private void LoadPortalGuns(int playerNumber)
-        {
-            PlayerIndex = playerNumber;
-            for (int i = 0; i < MAX_PORTAL_GUNS; i++)
-            {
-                string portalGunId = "PortalGun" + i + "Id";
-                Texture2D portalGunTexture = this.Helper.Content.Load<Texture2D>(
-                    $"Assets{Path.DirectorySeparatorChar}PortalGun" + (i + 1) + ".png");
-
-                PortalGunObjects[i] = CustomObjectData.newObject(portalGunId, portalGunTexture,
-                    Color.White, "Portal Gun " + i, "Property of Aperture Science Inc.", 0, "", "Basic", 1, -300, "",
-                    craftingData: new CraftingData("Portal Gun " + i, "388 1"));
-
-                PortalGuns[i] = new PortalGun(portalGunId, i, MAX_PORTALS);
             }
         }
 
@@ -666,7 +600,10 @@ namespace MultiplayerPortalGuns
             if (portalPositions == null)
                 Helper.Data.WriteJsonFile(LocationSaveFileName, ActivePortalSprites.GetAllItems());
             else
-                ReloadPortals(portalPositions);
+            {
+                PortalGuns.ReloadPortals(portalPositions);
+                AddWarpsAndSprites(portalPositions);
+            }
         }
 
         private void LoadTileSheet(GameLocation location)

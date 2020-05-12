@@ -69,6 +69,7 @@
     <Compile Include="ModEntry.cs" />
     <Compile Include="PortalGun.cs" />
     <Compile Include="Portal.cs" />
+    <Compile Include="PortalGunManager.cs" />
     <Compile Include="PortalPosition.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

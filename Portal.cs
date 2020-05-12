@@ -14,11 +14,6 @@ namespace MultiplayerPortalGuns
 
         public Tile OldTile { get; set; }
 
-        //public Portal() { }
         public Portal() { }
-        public Portal(PortalPosition portalPosition)
-        {
-            this.PortalPos = portalPosition;
-        }
     }
 }
