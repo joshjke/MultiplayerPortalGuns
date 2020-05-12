@@ -1,5 +1,5 @@
 ﻿/// Stardew Valley Multiplayer Portal Guns Mod
-/// by Josh Kennedy
+/// by JoshJKe
 
 using System.Collections.Generic;
 using System.IO;
@@ -17,89 +17,74 @@ using xTile.Layers;
 using xTile.Tiles;
 
 using PyTK.CustomElementHandler;
-using xTile.Dimensions;
 using System;
-using Antlr.Runtime.Tree;
 
-using SimpleSoundManager;
-using SimpleSoundManager.Framework;
-using Microsoft.Xna.Framework.Audio;
 
 namespace MultiplayerPortalGuns
 {
     class ModEntry : Mod
     {
-        // For portal retract key
+        // contains portal retract key
         private ModConfig config;
 
         public const int MAX_PORTAL_GUNS = 4;
         public const int MAX_PORTALS = 2;
-        public const int MAX_PORTAL_SPRITES = 90;
+        public const int MAX_PORTAL_SPRITES = 50;
         public const int PORTAL_ANIM_FRAMES = 5;
-
-        private int PlayerIndex;
-        public List<long> PlayerList = new List<long>();
 
         PortalGun[] PortalGuns = new PortalGun[MAX_PORTAL_GUNS];
         CustomObjectData[] PortalGunObjects = new CustomObjectData[MAX_PORTAL_GUNS];
+
+        // Assigned player index for mapping to a personal portal gun
+        private int PlayerIndex;
+        public List<long> PlayerList = new List<long>();
 
         // Used for late updating the map's tile sprites in multiplayer when a portal is made
         LocationUpdater<PortalPosition> AddedPortalSprites;
         LocationUpdater<PortalPosition> RemovedPortalSprites;
 
-        // Used for updating the portal tables of farmhands when they join
+        // Used for saving/loading, updating late join farmhands, and mine levels
         LocationUpdater<PortalPosition> ActivePortalSprites;
-        
-        // Portals to be animated if they are placed in the location the player
-        // is currently in
+
+        // Portals having their animations played
         LocationUpdater<PortalPosition> AnimatedPortals;
 
         // Filepaths
         private string LocationSaveFileName;
         private string TileSheetPath;
-        private string SoundsPath;
-
-        SoundManager sound;
 
 
         public override void Entry(IModHelper helper)
         {
             this.config = helper.ReadConfig<ModConfig>();
 
+            // setting filepaths
             Directory.CreateDirectory(
                 $"{this.Helper.DirectoryPath}{Path.DirectorySeparatorChar}Data{Path.DirectorySeparatorChar}");
-
             TileSheetPath = this.Helper.Content.GetActualAssetKey($"Assets{Path.DirectorySeparatorChar}PortalsAnimated3.png", ContentSource.ModFolder);
 
-            SoundsPath = $"{this.Helper.DirectoryPath}{Path.DirectorySeparatorChar}Assets{Path.DirectorySeparatorChar}Sounds";
-
-
+            // SMAPI events used
+            helper.Events.Input.ButtonPressed += this.Input_ButtonPressed;
             helper.Events.GameLoop.SaveLoaded += this.AfterLoad;
+            helper.Events.Multiplayer.ModMessageReceived += this.Multiplayer_ModMessageReceived;
+            helper.Events.Multiplayer.PeerContextReceived += this.Multiplayer_PeerContextReceived;
+            helper.Events.GameLoop.UpdateTicked += this.GameLoop_UpdateTicked;
             helper.Events.Player.Warped += this.Warped;
-            helper.Events.Multiplayer.ModMessageReceived += Multiplayer_ModMessageReceived;
-            helper.Events.Multiplayer.PeerContextReceived += Multiplayer_PeerContextReceived;
-            helper.Events.Input.ButtonPressed += Input_ButtonPressed;
-            helper.Events.GameLoop.Saved += GameLoop_Saved;
-            helper.Events.GameLoop.UpdateTicked += GameLoop_UpdateTicked;
-
-            sound = new SoundManager();
-            sound.loadWavFile(this.Helper, "retractPortals", SoundsPath);
-
-           
-            XACTSound aCTSound = new XACTSound(())
+            helper.Events.GameLoop.Saved += this.GameLoop_Saved;
         }
 
+        /// <summary>
+        /// Animates portal sprites every frame
+        /// </summary>
         private void GameLoop_UpdateTicked(object sender, UpdateTickedEventArgs e)
         {
             AnimatePortals();
-
-            
-
         }
-
+        /// <summary>
+        /// Routes input based on the portal gun's buttons
+        /// </summary>
         private void Input_ButtonPressed(object sender, ButtonPressedEventArgs e)
         {
-
             if (!Context.IsWorldReady)
                 return;
 
@@ -110,19 +95,21 @@ namespace MultiplayerPortalGuns
             else if (e.Button.ToString().ToLower() == this.config.RetractPortals.ToLower())
                 RetractPortals(PlayerIndex);
 
-            else if (e.Button.ToString().ToLower() == "p" && Context.IsMainPlayer)
-                Helper.Data.WriteJsonFile(LocationSaveFileName, ActivePortalSprites.GetAllItems());
-
         }
 
         /******************************************************************************
          * Portal Addition and Placement
          *****************************************************************************/
+         /// <summary>
+         /// After player has used the tool/action button, check all conditions for
+         /// placing a portal
+         /// </summary>
+         /// <param name="e"></param>
         private void PortalSpawner(ButtonPressedEventArgs e)
         {
-            if (Game1.menuUp || Game1.activeClickableMenu != null || Game1.isFestival()
-                || Game1.player.ActiveObject == null || 
-                !Game1.player.CurrentItem.DisplayName.Contains("Portal Gun"))
+            if (Game1.menuUp || Game1.activeClickableMenu != null 
+                || Game1.isFestival() || Game1.player.ActiveObject == null 
+                || !Game1.player.CurrentItem.DisplayName.Contains("Portal Gun"))
                 return;
 
             int index = 0;
@@ -131,55 +118,29 @@ namespace MultiplayerPortalGuns
 
             else if (e.Button.IsActionButton())
                 index = 1;
-            // debugstuff
+
             Game1.switchToolAnimation();
 
-
             PortalPosition portalPos = PortalGuns[PlayerIndex].GetPortalPosition(index);
-
-
             if (portalPos == null)
             {
                 this.Monitor.Log("portalPosition is null", LogLevel.Debug);
-                //Game1.currentLocation.playSoundAt("debuffSpell", Game1.player.getTileLocation());
                 return;
             }
-
-            Portal portal = new Portal(portalPos);
-
-            //SpawnPortals(index);
 
             RemoveWarpAndSprite(PortalGuns[PlayerIndex].GetPortal(index).PortalPos);
             portalPos.AnimationFrame = 0;
             AddPortal(portalPos);
 
-            // Tile animation and stuff
-
-            // TODO animate the portal spawning
-            //PortalAnimationFrame[i] + i * 5
-
-            // Bells and whistles
-
-            // Portal Animation here
             Game1.currentLocation.playSoundAt("debuffSpell", Game1.player.getTileLocation());
         }
 
-        //private void OtherPlayerAddedPortal()
-
-        private void AddPortals(List<PortalPosition> PortalsToAdd)
-        {
-            if (PortalsToAdd == null)
-                return;
-            foreach (PortalPosition portal in PortalsToAdd.ToList())
-                AddPortal(portal);
-        }
         /// <summary>
         /// Places a portal at portalPosition
-        /// Prerequisites: checking for a valid placement position
+        /// Prerequisites: the player has shot a portal into a valid location and
+        ///  tile position
         /// </summary>
-        /// <param name="portalPosition">The portal to be placed</param>
-        /// <returns></returns>
-        private bool AddPortal(PortalPosition portalPosition)
+        private void AddPortal(PortalPosition portalPosition)
         {
             // remove the target's warp
             PortalPosition targetPortalPos = GetTargetPortal(portalPosition).PortalPos;
@@ -197,23 +158,30 @@ namespace MultiplayerPortalGuns
             // add the placed portal's warps and sprites
             Portal portal = PortalGuns[portalPosition.PlayerIndex].GetPortal(portalPosition.Index);
             AddWarpAndSprite(portal.PortalPos);
-
-            return true;
         }
 
+        /******************************************************************************
+         * Warp and Sprite Logic
+         *****************************************************************************/
         private void AddWarpsAndSprites(List<PortalPosition> portalPositions)
         {
             foreach (PortalPosition portalPosition in portalPositions)
                 AddWarpAndSprite(portalPosition);
         }
-
+        /// <summary>
+        /// Adds warp, sprite, and messsages other players to add the sprite
+        /// </summary>
+        /// <param name="portalPosition"></param>
         private void AddWarpAndSprite(PortalPosition portalPosition)
         {
             AddWarp(portalPosition);
             AddPortalSprite(portalPosition);
             this.Helper.Multiplayer.SendMessage(portalPosition, "AddPortalSprite", modIDs: new[] { this.ModManifest.UniqueID });
         }
-
+        /// <summary>
+        /// Removes warp, sprite, and messsages other players to remove the sprite
+        /// </summary>
+        /// <param name="portalPosition"></param>
         private void RemoveWarpAndSprite(PortalPosition portalPosition)
         {
             RemoveWarp(portalPosition);
@@ -221,13 +189,25 @@ namespace MultiplayerPortalGuns
             this.Helper.Multiplayer.SendMessage(portalPosition, "RemovePortalSprite", modIDs: new[] { this.ModManifest.UniqueID });
         }
 
+        /******************************************************************************
+         * PortalGun Logic
+        *****************************************************************************/
+        /// <summary>
+        /// Returns the portal the targeted by the passed portalPosition
+        /// </summary>
+        /// <param name="portalPosition"></param>
+        /// <returns></returns>
         public Portal GetTargetPortal(PortalPosition portalPosition)
         {
             return PortalGuns[portalPosition.PlayerIndex]
                 .GetTargetPortal(portalPosition.Index);
         }
 
-        private bool ReloadPortals(List<PortalPosition> portalPositions)
+        /// <summary>
+        /// Logically adds each portalPosition to their respective PortalGun
+        /// and updates the respective warps and sprites. Used when loading the game
+        /// </summary>
+        private void ReloadPortals(List<PortalPosition> portalPositions)
         {
             foreach (PortalPosition portalPosition in portalPositions)
             {
@@ -235,7 +215,7 @@ namespace MultiplayerPortalGuns
                     UpdateAddPortal(portalPosition);
             }
             AddWarpsAndSprites(portalPositions);
-            return true;
+            return;
         }
 
         private bool UpdateAddPortal(PortalPosition portalPosition)
@@ -247,6 +227,10 @@ namespace MultiplayerPortalGuns
         {
             PortalGuns[portalGunIndex].RemovePortals();
         }
+
+        /******************************************************************************
+         * Warp logic
+         *****************************************************************************/
 
         private bool AddWarp(PortalPosition portalPosition)
         {
@@ -267,7 +251,9 @@ namespace MultiplayerPortalGuns
             Game1.getLocationFromName(portalPosition.LocationName).warps.Add(warp);
             return true;
         }
-
+        /// <summary>
+        /// The main player removes the warp at the portalPosition
+        /// </summary>
         private bool RemoveWarp(PortalPosition portalPosition)
         {
             // Warps are global, so only have host handle them to avoid duplicates and ghosts
@@ -294,19 +280,9 @@ namespace MultiplayerPortalGuns
             return PortalGuns[portalPosition.PlayerIndex].GetWarp(portalPosition.Index);
         }
 
-        private bool RemoveWarps(List<PortalPosition> portalPositions)
-        {
-            if (portalPositions == null)
-                return false;
-            bool allRemoved = true;
-            foreach (PortalPosition portalPosition in portalPositions.ToList())
-            {
-                if (!RemoveWarp(portalPosition))
-                    allRemoved = false;
-            }
-            return allRemoved;
-        }
-
+        /******************************************************************************
+         * Portal Sprite Additions
+         *****************************************************************************/
 
         private bool AddPortalSprite(PortalPosition portalPosition)
         {
@@ -353,6 +329,10 @@ namespace MultiplayerPortalGuns
             layer.Tiles[portalPosition.X, portalPosition.Y] = new StaticTile(
                 layer, tileSheet, BlendMode.Additive, GetPortalSpriteIndex(portalPosition));
         }
+
+        /******************************************************************************
+         * Portal Animations
+         *****************************************************************************/
         private void AnimatePortals() 
         {
             if (AnimatedPortals == null)
@@ -399,6 +379,10 @@ namespace MultiplayerPortalGuns
             return allRemoved;
         }
 
+        /******************************************************************************
+         * Portal Sprite Removal
+         *****************************************************************************/
+
         public bool RemovePortalSprite(PortalPosition portalPosition)
         {
             return RemovePortalSprite(portalPosition.LocationName, portalPosition);
@@ -442,6 +426,27 @@ namespace MultiplayerPortalGuns
             return allRemoved;
         }
 
+        /******************************************************************************
+         * Portal Resetting. Mostly used for entering mine locations
+         *****************************************************************************/
+        private void ResetWarpsAndSprites(List<PortalPosition> portalPositions)
+        {
+            if (portalPositions == null)
+                return;
+            foreach (PortalPosition portalPosition in portalPositions)
+            {
+                ResetWarpAndSprite(portalPosition);
+            }
+        }
+
+        private void ResetWarpAndSprite(PortalPosition portalPosition)
+        {
+            RemoveWarp(portalPosition);
+            AddWarp(portalPosition);
+            RemovePortalSprite(portalPosition);
+            AddPortalSprite(portalPosition);
+        }
+
 
         /******************************************************************************
          * Portal Removal
@@ -461,12 +466,6 @@ namespace MultiplayerPortalGuns
             // Bells and Whistles
             Game1.switchToolAnimation();
             //Game1.currentLocation.playSoundAt("serpentDie", Game1.player.getTileLocation());
-            //sound.playSound("retractPortals");
-            if (sound.sounds.TryGetValue("retractPortals", out Sound retractSound))
-                retractSound.play();
-            
-            //sound.
-
 
         }
 
@@ -508,33 +507,12 @@ namespace MultiplayerPortalGuns
             }
         }
 
-        private void ResetWarpsAndSprites(List<PortalPosition> portalPositions)
-        {
-            if (portalPositions == null)
-                return;
-            foreach (PortalPosition portalPosition in portalPositions)
-            {
-                ResetWarpAndSprite(portalPosition);
-            }
-        }
-
-        private void ResetWarpAndSprite(PortalPosition portalPosition)
-        {
-            RemoveWarp(portalPosition);
-            AddWarp(portalPosition);
-            RemovePortalSprite(portalPosition);
-            AddPortalSprite(portalPosition);
-        }
 
         /******************************************************************************
          * Multiplayer Routing
          *****************************************************************************/
         private void Multiplayer_ModMessageReceived(object sender, ModMessageReceivedEventArgs e)
         {
-            /* // Message from Host to targeted Peer to give PortalTable to them
-             if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "SetPortalTable" + this.PlayerIndex)
-                 SetPortalTable(e.ReadAs<LocationUpdater<PortalPosition>>());*/
-            long holdthisThanks = Game1.player.UniqueMultiplayerID;
             // Message from host to targeted Peer to assign PlayerIndex
             if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "PlayerIndex")
                 LoadPortalGuns(e.ReadAs<int>());
@@ -579,7 +557,6 @@ namespace MultiplayerPortalGuns
 
             else if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "UpdateRemovePortals")
                 UpdateRemovePortals(e.ReadAs<int>());
-
 
             else if (e.FromModID == "JoshJKe.PortalGun" && e.Type == "GetActivePortalSprites")
                 SendActivePortalSprites(e.FromPlayerID);
@@ -626,8 +603,6 @@ namespace MultiplayerPortalGuns
                 int playerIndexForNewPlayer = PlayerList.Count;
                 this.Helper.Multiplayer.SendMessage(playerIndexForNewPlayer, "PlayerIndex", modIDs: new[] { this.ModManifest.UniqueID }, new long[] { e.Peer.PlayerID });
             }
-
-            
         }
 
         /******************************************************************************
@@ -660,26 +635,7 @@ namespace MultiplayerPortalGuns
                this.Helper.Multiplayer.SendMessage(Game1.player.UniqueMultiplayerID, "GetActivePortalSprites",
                modIDs: new[] { this.ModManifest.UniqueID });
             }
-
-
-            // TODO LoadPortalSaves();
         }
-        /* // Not sure why there's a duplicate function, investigate w/ mutliplayer
-        private void AfterLoad(object sender, EventArgs e)
-        {
-            this.Monitor.Log("hitting after load, eventArs");
-            if (Context.IsMainPlayer)
-            {
-                PlayerIndex = 1;
-                PlayerList.Add(0);
-                LoadPortalGuns(1);
-
-                LoadPortalTextures();
-                LoadMinePortals();
-            }
-
-            // TODO LoadPortalSaves();
-        } */
 
         private void LoadPortalGuns(int playerNumber)
         {
@@ -693,9 +649,6 @@ namespace MultiplayerPortalGuns
                 PortalGunObjects[i] = CustomObjectData.newObject(portalGunId, portalGunTexture,
                     Color.White, "Portal Gun " + i, "Property of Aperture Science Inc.", 0, "", "Basic", 1, -300, "",
                     craftingData: new CraftingData("Portal Gun " + i, "388 1"));
-
-                /*if (i == playerNumber)
-                    PortalGunObjects[i].craftingData = new CraftingData("Portal Gun " + i, "388 1");*/
 
                 PortalGuns[i] = new PortalGun(portalGunId, i, MAX_PORTALS);
             }
@@ -714,7 +667,6 @@ namespace MultiplayerPortalGuns
                 Helper.Data.WriteJsonFile(LocationSaveFileName, ActivePortalSprites.GetAllItems());
             else
                 ReloadPortals(portalPositions);
-
         }
 
         private void LoadTileSheet(GameLocation location)
@@ -736,29 +688,20 @@ namespace MultiplayerPortalGuns
             }
         }
 
-        
-
         private void LoadPortalTextures()
         {
             foreach (GameLocation location in GetLocations())
+                LoadTileSheet(location);
+        }
+
+        private void LoadMinePortals()
+        {
+            int mineLevel = Game1.player.deepestMineLevel;
+            for (int i = 1; i <= mineLevel; i++)
             {
-                // Add the tilesheet.
-                TileSheet tileSheet = new TileSheet(
-                   id: "z_portal-spritesheet", // a unique ID for the tilesheet
-                   map: location.map,
-                   imageSource: TileSheetPath,
-                   sheetSize: new xTile.Dimensions.Size(800, 16), // the pixel size of your tilesheet image.
-                   tileSize: new xTile.Dimensions.Size(16, 16) // should always be 16x16 for maps
-                );
-
-                if (location != null && location.map != null && tileSheet != null)
-                {
-                    //this.Monitor.Log("adding and loading tilesheet in all maps", LogLevel.Debug);
-                    location.map.AddTileSheet(tileSheet);// Multiplayer load error here
-                    location.map.LoadTileSheets(Game1.mapDisplayDevice);
-                }
+                GameLocation location = Game1.getLocationFromName($"UndergroundMine{i}");
+                LoadTileSheet(location);
             }
-
         }
 
         /// <summary>Get all game locations.</summary>
@@ -773,30 +716,9 @@ namespace MultiplayerPortalGuns
                 );
         }
 
-        private void LoadMinePortals()
-        {
-            int mineLevel = Game1.player.deepestMineLevel;
-            for (int i = 1; i <= mineLevel; i++)
-            {
-                GameLocation location = Game1.getLocationFromName($"UndergroundMine{i}");
-
-                // Add the tilesheet.
-                TileSheet tileSheet = new TileSheet(
-                   id: "z_portal-spritesheet", // a unique ID for the tilesheet
-                   map: location.map,
-                   imageSource: TileSheetPath,
-                   sheetSize: new xTile.Dimensions.Size(800, 16), // the pixel size of your tilesheet image.
-                   tileSize: new xTile.Dimensions.Size(16, 16) // should always be 16x16 for maps
-                );
-                location.map.AddTileSheet(tileSheet);
-                location.map.LoadTileSheets(Game1.mapDisplayDevice);
-            }
-        }
-
         private void GameLoop_Saved(object sender, SavedEventArgs e)
         {
-            // error here
-            if (Context.IsMainPlayer)
+            if (Context.IsMainPlayer && ActivePortalSprites != null)
                 Helper.Data.WriteJsonFile(LocationSaveFileName, ActivePortalSprites.GetAllItems());
         }
 
