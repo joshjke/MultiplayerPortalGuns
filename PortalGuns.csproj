@@ -7,8 +7,8 @@
     <ProjectGuid>{1EF732AE-6291-4E34-9114-A5D447ED8972}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>MultiplayerPortalGuns</RootNamespace>
-    <AssemblyName>MultiplayerPortalGuns</AssemblyName>
+    <RootNamespace>PortalGun</RootNamespace>
+    <AssemblyName>PortalGun</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>

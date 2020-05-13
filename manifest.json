@@ -2,13 +2,12 @@
   "Name": "Portal Guns",
   "Author": "JoshJKe",
   "Version": "1.1.0",
-  "Description": "Adds a functional portal gun",
+  "Description": "Adds multiplayer-ready, portal guns ",
   "Dependencies": [
-    { "UniqueID": "Platonymous.Toolkit" },
-    { "UniqueID": "Omegasis.SimpleSoundManager" }
+    { "UniqueID": "Platonymous.Toolkit" }
   ],
   "UniqueID": "JoshJKe.PortalGun",
-  "EntryDll": "MultiplayerPortalGuns.dll",
+  "EntryDll": "PortalGun.dll",
   "MinimumApiVersion": "2.10.0",
   "UpdateKeys": [ "Nexus:3049" ]
 }

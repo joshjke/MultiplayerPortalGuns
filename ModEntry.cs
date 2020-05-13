@@ -82,7 +82,17 @@ namespace MultiplayerPortalGuns
 
             // Retract portals of current portal gun
             else if (e.Button.ToString().ToLower() == this.config.RetractPortals.ToLower())
+            {
                 RetractPortals(PlayerIndex);
+                Game1.switchToolAnimation();
+            }
+
+            else if (Context.IsMainPlayer &&
+                e.Button.ToString().ToLower() == this.config.RetractAllPortals.ToLower())
+            {
+                RetractAllPortals();
+                Game1.switchToolAnimation();
+            }
 
         }
 
@@ -226,7 +236,11 @@ namespace MultiplayerPortalGuns
             // Notify players
             this.Helper.Multiplayer.SendMessage(portalGunIndex, "UpdateRemovePortals", modIDs: new[] { this.ModManifest.UniqueID });
 
-            Game1.switchToolAnimation();
+        }
+        private void RetractAllPortals()
+        {
+            for (int i = 0; i < PortalGuns.GetMaxPortalGuns(); i++)
+                RetractPortals(i);
         }
 
         private void RemovePortals(int gunIndex)

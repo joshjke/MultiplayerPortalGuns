@@ -63,6 +63,11 @@ namespace MultiplayerPortalGuns
             PortalGuns[portalPosition.PlayerIndex].AddPortal(portalPosition);
         }
 
+        public int GetMaxPortalGuns()
+        {
+            return MAX_PORTAL_GUNS;
+        }
+
         /// <summary>
         /// Returns the portal the targeted by the passed portalPosition
         /// </summary>
@@ -80,6 +85,11 @@ namespace MultiplayerPortalGuns
         public void RemovePortals(int portalGunIndex)
         {
             PortalGuns[portalGunIndex].RemovePortals();
+        }
+        public void RemoveAllPortals()
+        {
+            for (int i = 0; i < MAX_PORTAL_GUNS; i++)
+                PortalGuns[i].RemovePortals();
         }
 
         public List<Portal> GetPortals(int portalGunIndex)

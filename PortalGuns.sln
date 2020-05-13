@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29123.88
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MultiplayerPortalGuns", "MultiplayerPortalGuns.csproj", "{1EF732AE-6291-4E34-9114-A5D447ED8972}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PortalGuns", "PortalGuns.csproj", "{1EF732AE-6291-4E34-9114-A5D447ED8972}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
